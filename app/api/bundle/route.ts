@@ -101,5 +101,11 @@ export async function POST(req: Request) {
   }
 
   total = Math.round(total * 100) / 100;
-  return Response.json({ lines, total, note, gaps });
+  // Model numbers are never trusted: strip any currency figures from the note
+  // so the server-computed total stays the single source of truth.
+  const cleanNote = note
+    .replace(/[^.!?]*[$≈]\s?\d[\d.,]*[^.!?]*[.!?]?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return Response.json({ lines, total, note: cleanNote, gaps });
 }
