@@ -58,11 +58,13 @@ const CONDITION_PRIORITY: Record<Listing["condition"], number> = {
 
 function rowToListing(r: Record<string, unknown>): ListingRow {
   const isWant = r.kind === "want";
+  const cardCode = r.cardCode === null || r.cardCode === undefined ? null : String(r.cardCode);
   const listing: ListingRow = {
     id: String(r.id),
     cardName: String(r.cardName),
-    cardCode: r.cardCode === null || r.cardCode === undefined ? null : String(r.cardCode),
-    set: "OGN",
+    cardCode,
+    // cardCode prefix IS the set code ("ogn-…" → OGN); sealed/bulk rows (null) are Origins products.
+    set: (cardCode ? cardCode.slice(0, 3).toUpperCase() : "OGN") as Listing["set"],
     printing: (r.printing ?? "standard") as Listing["printing"],
     rarity: (r.rarity ?? "common") as Listing["rarity"],
     type: (r.type ?? "unit") as Listing["type"],

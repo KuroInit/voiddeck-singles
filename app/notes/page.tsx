@@ -85,7 +85,9 @@ export default async function NotesPage() {
             far, no passwords.
           </li>
           <li>
-            Seeded singles are an <strong>Origins (OGN) subset</strong>. Card{" "}
+            Seeded listings span <strong>all five sets</strong> (Origins, Proving
+            Grounds, Spiritforged, Unleashed, Vendetta) — all six runes in multiple
+            printings, chase epics, playsets and commons. Card{" "}
             <em>names and set facts are real</em> — verified against public Riftbound set
             lists.
           </li>

@@ -135,6 +135,11 @@ function FilterGroups({
 }) {
   return (
     <div className="flex flex-col gap-5 px-1 pb-2">
+      <FilterGroup label="Set">
+        {(["OGN", "OGS", "SFD", "UNL", "VEN"] as const).map((s) => (
+          <Chip key={s} label={s} active={facets.set === s} onClick={() => toggle("set", s)} />
+        ))}
+      </FilterGroup>
       <FilterGroup label="Rarity">
         {(["common", "uncommon", "rare", "epic", "showcase"] as const).map((r) => (
           <Chip key={r} label={r[0].toUpperCase() + r.slice(1)} active={facets.rarity === r} onClick={() => toggle("rarity", r)} />
