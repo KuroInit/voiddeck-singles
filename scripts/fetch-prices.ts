@@ -33,6 +33,8 @@ const PER_PAGE_TIMEOUT_MS = 20_000;
 const PAGE_DELAY_MS = 300;
 const MAX_BILGEWATER_PAGES = 200;
 
+import cardsJson from "../src/data/cards.json";
+
 const asOf = () => new Date().toISOString().slice(0, 10);
 
 // bilgewater print_variation preference: base EN printing first, then foil,
@@ -191,6 +193,81 @@ async function fetchRbcl(context: BrowserContext): Promise<Record<string, { usd:
   return out;
 }
 
+/**
+ * Secondary bilgewater pass: per-card detail pages for cardCodes the feed did
+ * not cover (e.g. showcase signatures like OGN-299*, promo tokens like
+ * UNL-T04). Page pattern: https://bilgewatermarket.com/cards/<ID>
+ * ?print_variation=<variant>, where ID is "<SET>-<NUM>*" for codes shaped
+ * "set-num-star-total" and "<SET>-<NUM>" otherwise. Known limitation: the SPA
+ * gates card-detail fetches behind Firebase App Check, which returns 403 for
+ * headless clients — the page then renders "Card not found." and yields no
+ * price. Implemented anyway so the pass works wherever App Check succeeds.
+ */
+async function fetchBilgewaterCardPages(
+  context: BrowserContext,
+  missingCodes: string[],
+  pageBudget: number
+): Promise<{ prices: Record<string, { usd: number }>; failures: string[] }> {
+  const page: Page = await context.newPage();
+  page.setDefaultTimeout(PER_PAGE_TIMEOUT_MS);
+  const prices: Record<string, { usd: number }> = {};
+  const failures: string[] = [];
+  const VARIANTS = ["signature", "showcase", "normal", "foiled", "promo", ""];
+  let attempts = 0;
+
+  const idCandidates = (code: string): string[] => {
+    const [set, ...rest] = code.split("-");
+    const tail = rest.join("-");
+    if (tail.includes("-star-")) {
+      return [`${set}-${tail.split("-")[0]}*`.toUpperCase()];
+    }
+    return [`${set}-${tail}`.toUpperCase()];
+  };
+
+  for (const code of missingCodes) {
+    let reason = "all ID/variant candidates exhausted";
+    outer: for (const id of idCandidates(code)) {
+      for (const variant of VARIANTS) {
+        if (attempts >= pageBudget) {
+          reason = "page budget exhausted";
+          break outer;
+        }
+        const url = `https://bilgewatermarket.com/cards/${encodeURIComponent(id)}${
+          variant ? `?print_variation=${variant}` : ""
+        }`;
+        attempts++;
+        try {
+          await page.goto(url, { waitUntil: "domcontentloaded" });
+          await page.waitForSelector('text=/Card not found|\\$[0-9]/i', {
+            timeout: PER_PAGE_TIMEOUT_MS,
+          });
+          const text = await page.evaluate(() => document.body.innerText);
+          if (/card not found/i.test(text)) {
+            reason = `page renders "Card not found" (Firebase App Check unavailable in headless; detail API gated)`;
+            break outer; // no point trying other variants for this ID
+          }
+          const pm = text.match(/US?\$\s?([0-9,]+\.[0-9]{2})/);
+          if (pm) {
+            prices[code] = {
+              usd: Math.round(Number.parseFloat(pm[1].replace(/,/g, "")) * 100) / 100,
+            };
+            reason = "";
+            break outer;
+          }
+          reason = "page rendered but no USD price found in DOM";
+          break outer;
+        } catch (err) {
+          reason = `navigation/DOM error: ${String(err).slice(0, 120)}`;
+        }
+        await delay(PAGE_DELAY_MS);
+      }
+    }
+    if (!prices[code]) failures.push(`${code}: ${reason}`);
+  }
+  await page.close();
+  return { prices, failures };
+}
+
 async function main(): Promise<void> {
   let source: "bilgewater-market" | "tcgplayer-mirror";
   let prices: Record<string, { usd: number }> = {};
@@ -207,6 +284,20 @@ async function main(): Promise<void> {
     }
     if (Object.keys(prices).length >= 100) {
       source = "bilgewater-market";
+      // Second bilgewater pass: per-card pages for codes the feed skipped.
+      const knownCodes: string[] = cardsJson.map((c) => c.cardCode);
+      const missing = knownCodes.filter((c) => !prices[c]);
+      const remainingBudget = MAX_BILGEWATER_PAGES - Math.floor(Object.keys(prices).length / 50);
+      if (missing.length > 0 && remainingBudget > 0) {
+        console.log(`[fetch-prices] ${missing.length} codes missing from feed; trying per-card pages`);
+        const { prices: extra, failures: cardFailures } = await fetchBilgewaterCardPages(
+          context,
+          missing,
+          remainingBudget
+        );
+        Object.assign(prices, extra);
+        failures.push(...cardFailures);
+      }
     } else {
       if (Object.keys(prices).length > 0) {
         failures.push("bilgewatermarket API delivered < 100 codes; falling back");
