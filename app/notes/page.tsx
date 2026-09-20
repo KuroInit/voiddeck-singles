@@ -148,6 +148,13 @@ export default async function NotesPage() {
           repriced and re-clamped server-side against the real listing data.
         </p>
         <p>
+          The chat model is <code>openai/gpt-4o-mini</code> served through the
+          CognitioLabs class gateway (OpenRouter route). The gateway may substitute
+          another model when the weekly allowance runs out — the app only assumes an
+          OpenAI-compatible <code>/chat/completions</code>, so it keeps working either
+          way.
+        </p>
+        <p>
           If the gateway is not configured, the AI surfaces render an honest
           &ldquo;AI unavailable&rdquo; state instead of a plausible-sounding fake answer —
           and search keeps working exactly the same, because it never needed the gateway.

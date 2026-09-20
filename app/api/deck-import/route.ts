@@ -11,7 +11,7 @@ import { aiConfigured, chatJSON } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
-const AI_NOTE_TIMEOUT_MS = 8_000;
+const AI_NOTE_TIMEOUT_MS = 20_000;
 const MAX_NOTE_CHARS = 140;
 const MAX_NOTE_WORDS = 14;
 
@@ -37,20 +37,23 @@ async function aiNotes(
   try {
     const cards = proposals.map((p) => `${p.cardCode}: ${p.cardName}`).join("\n");
     const result = await Promise.race([
-      chatJSON([
-        {
-          role: "system",
-          content:
-            "You draft short notes for trading-card want posts. Reply with JSON only.",
-        },
-        {
-          role: "user",
-          content:
-            `A deck called "${deckName}" is missing these cards. For each cardCode, ` +
-            "draft a casual want-post note of at most 14 words that mentions the card. " +
-            `Reply exactly as {"notes": {"<cardCode>": "<note>"}}.\n${cards}`,
-        },
-      ]),
+      chatJSON(
+        [
+          {
+            role: "system",
+            content:
+              "You draft short notes for trading-card want posts. Reply with JSON only.",
+          },
+          {
+            role: "user",
+            content:
+              `A deck called "${deckName}" is missing these cards. For each cardCode, ` +
+              "draft a casual want-post note of at most 14 words that mentions the card. " +
+              `Reply exactly as {"notes": {"<cardCode>": "<note>"}}.\n${cards}`,
+          },
+        ],
+        1600
+      ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("AI note timeout")), AI_NOTE_TIMEOUT_MS)
       ),
