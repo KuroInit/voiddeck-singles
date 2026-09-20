@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { findCard } from "@/data/cards";
+import { FoilArt } from "@/components/foil-art";
 import { addWtbPost, addToCart } from "@/lib/marketplace";
 import { revealStagger, bump } from "@/lib/motion";
 import {
@@ -225,15 +226,17 @@ export function DeckImportSheet({
                       key={`${line.cardCode}-${line.name}-${i}`}
                       className="flex items-center gap-3 rounded-lg border border-border px-3 py-2"
                     >
-                      {card?.imageUrl ? (
-                        <img
-                          src={card.imageUrl}
-                          alt={line.name}
-                          className="h-12 w-9 shrink-0 rounded object-cover ring-1 ring-foreground/10"
-                        />
-                      ) : (
-                        <div className="h-12 w-9 shrink-0 rounded bg-zinc-800 ring-1 ring-foreground/10" />
-                      )}
+                      <FoilArt cardCode={line.inDb ? line.cardCode : null} className="h-12 w-9 shrink-0 rounded ring-1 ring-foreground/10">
+                        {card?.imageUrl ? (
+                          <img
+                            src={card.imageUrl}
+                            alt={line.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-zinc-800" />
+                        )}
+                      </FoilArt>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">
                           {line.qty}× {line.name}

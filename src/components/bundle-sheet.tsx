@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { Listing } from "@/data/listings";
 import { addToCart, getAllListings } from "@/lib/marketplace";
 import { findCard } from "@/data/cards";
+import { FoilArt } from "@/components/foil-art";
+import { CardFrame } from "@/components/card-frame";
 import { revealStagger, bump } from "@/lib/motion";
 import {
   Sheet,
@@ -204,13 +206,21 @@ export function BundleSheet({
                       key={line.id}
                       className="flex items-center gap-3 rounded-lg border border-border px-3 py-2"
                     >
-                      {card?.imageUrl ? (
-                        <img
-                          src={card.imageUrl}
-                          alt={card.fullName}
-                          className="h-12 w-9 shrink-0 rounded object-cover ring-1 ring-foreground/10"
-                        />
-                      ) : null}
+                      <FoilArt cardCode={card?.cardCode ?? listing?.cardCode ?? null} className="h-12 w-9 shrink-0 rounded ring-1 ring-foreground/10">
+                        {card?.imageUrl ? (
+                          <img
+                            src={card.imageUrl}
+                            alt={card.fullName}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <CardFrame
+                            name={card?.fullName ?? listing?.cardName ?? line.id}
+                            rarity={listing?.rarity}
+                            className="h-full w-full"
+                          />
+                        )}
+                      </FoilArt>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{listing?.cardName ?? line.id}</div>
                         <div className="text-xs text-muted-foreground">

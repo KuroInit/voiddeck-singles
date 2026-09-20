@@ -12,6 +12,8 @@ import { USD_SGD, getPriceFor } from "@/lib/prices";
 import { LISTING_TYPES, pickupLabel } from "@/lib/rarity";
 import { revealStagger } from "@/lib/motion";
 import { CardPicker } from "@/components/card-picker";
+import { FoilArt } from "@/components/foil-art";
+import { CardFrame } from "@/components/card-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,13 +125,17 @@ export function SellPanel() {
           }}
         >
           <div className="flex gap-3">
-            {card.imageUrl ? (
-              <img
-                src={card.imageUrl}
-                alt={card.fullName}
-                className="h-20 w-14 shrink-0 rounded-md object-cover ring-1 ring-foreground/10"
-              />
-            ) : null}
+            <FoilArt cardCode={card.cardCode} className="h-20 w-14 shrink-0 rounded-md ring-1 ring-foreground/10">
+              {card.imageUrl ? (
+                <img
+                  src={card.imageUrl}
+                  alt={card.fullName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <CardFrame name={card.fullName} rarity={card.rarity} className="h-full w-full" />
+              )}
+            </FoilArt>
             <div className="min-w-0">
               <div className="text-sm font-medium">{card.fullName}</div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

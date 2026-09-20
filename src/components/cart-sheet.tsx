@@ -18,6 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { CardFrame } from "@/components/card-frame";
+import { FoilArt } from "@/components/foil-art";
 import { findCard } from "@/data/cards";
 import type { Listing } from "@/data/listings";
 import { checkoutCart, getCart, getAllListings, removeFromCart } from "@/lib/marketplace";
@@ -28,22 +29,26 @@ type CartLine = { listing: Listing; qty: number };
 
 function CartThumb({ listing }: { listing: Listing }) {
   const card = findCard(listing.cardCode);
-  if (card?.imageUrl) {
-    return (
-      <img
-        src={card.imageUrl}
-        alt={listing.cardName}
-        loading="lazy"
-        className="aspect-[744/1039] w-9 shrink-0 rounded object-cover"
-      />
-    );
-  }
   return (
-    <CardFrame
-      name={listing.cardName}
-      rarity={listing.rarity}
-      className="aspect-[744/1039] w-9 shrink-0 rounded"
-    />
+    <FoilArt
+      cardCode={listing.cardCode}
+      className="w-9 shrink-0 rounded ring-1 ring-foreground/10"
+    >
+      {card?.imageUrl ? (
+        <img
+          src={card.imageUrl}
+          alt={listing.cardName}
+          loading="lazy"
+          className="aspect-[744/1039] w-full object-cover"
+        />
+      ) : (
+        <CardFrame
+          name={listing.cardName}
+          rarity={listing.rarity}
+          className="aspect-[744/1039] w-full"
+        />
+      )}
+    </FoilArt>
   );
 }
 
