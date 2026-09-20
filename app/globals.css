@@ -129,7 +129,9 @@
   }
 }
 
-/* --- Holo shimmer: applied to card art whose printing has a foil variant --- */
+/* --- Holo shimmer: applied to card art whose printing has a foil variant.
+      Light plays IN PLACE (iridescent sheen + glints breathing opacity/hue),
+      never slides across the art. --- */
 .holo-sheen {
   position: relative;
   overflow: hidden;
@@ -143,28 +145,67 @@
   pointer-events: none;
   mix-blend-mode: screen;
   background: linear-gradient(
-    115deg,
-    transparent 32%,
-    rgba(255, 255, 255, 0.22) 44%,
-    rgba(251, 191, 36, 0.28) 50%,
-    rgba(139, 92, 246, 0.18) 56%,
-    rgba(255, 255, 255, 0.22) 60%,
-    transparent 72%
+    118deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(251, 191, 36, 0.12) 22%,
+    rgba(255, 255, 255, 0.05) 38%,
+    rgba(139, 92, 246, 0.12) 58%,
+    rgba(255, 255, 255, 0.14) 78%,
+    rgba(56, 189, 248, 0.10) 100%
   );
-  background-size: 260% 260%;
-  animation: holo-sweep 3.4s linear infinite;
+  opacity: 0.35;
+  filter: hue-rotate(0deg) saturate(1);
+  animation: holo-breathe 2.8s ease-in-out infinite alternate;
 }
-@keyframes holo-sweep {
-  0% {
-    background-position: 130% 0;
+/* Three stationary glints that twinkle on the spot. */
+.holo-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background-image:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.85) 0%, transparent 1.6%),
+    radial-gradient(circle at 74% 40%, rgba(255, 255, 255, 0.75) 0%, transparent 1.4%),
+    radial-gradient(circle at 48% 72%, rgba(255, 236, 190, 0.8) 0%, transparent 1.8%);
+  opacity: 0.15;
+  animation: holo-glint 3.1s ease-in-out infinite;
+}
+@keyframes holo-breathe {
+  from {
+    opacity: 0.22;
+    filter: hue-rotate(0deg) saturate(0.9);
   }
+  to {
+    opacity: 0.6;
+    filter: hue-rotate(36deg) saturate(1.25);
+  }
+}
+@keyframes holo-glint {
+  0%,
   100% {
-    background-position: -140% 0;
+    opacity: 0.12;
+  }
+  45% {
+    opacity: 0.55;
+  }
+  60% {
+    opacity: 0.2;
+  }
+  80% {
+    opacity: 0.5;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .holo-sheen::after {
+  .holo-sheen::after,
+  .holo-sheen::before {
     animation: none;
-    background-position: 46% 0;
+  }
+  .holo-sheen::after {
+    opacity: 0.4;
+  }
+  .holo-sheen::before {
+    opacity: 0.3;
   }
 }

@@ -41,9 +41,9 @@ export function BuyTab() {
   const onFacets = useCallback((next: Listing[]) => setShown(next), []);
 
   const onSearchResults = useCallback(
-    (listings: Listing[] | null, meta: { source: string; reasons: Record<string, string> } | null) => {
+    (listings: Listing[] | null, reasons: Record<string, string>) => {
       setBase(listings);
-      setReasons(meta?.reasons ?? {});
+      setReasons(reasons);
       if (listings === null) setShown(catalogue);
     },
     [catalogue]

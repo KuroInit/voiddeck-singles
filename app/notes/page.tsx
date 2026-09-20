@@ -46,7 +46,9 @@ export default function NotesPage() {
         Voiddeck Singles — an AI-enabled second-hand marketplace for Riftbound TCG singles,
         built for Singapore buyers and sellers as a demo. Name explained in one line: a
         &ldquo;void deck&rdquo; is the sheltered ground floor common to HDB blocks, and a
-        &ldquo;single&rdquo; is one card — so: the void-deck card market.
+        &ldquo;single&rdquo; is one card — so: the void-deck card market. Search is a
+        plain deterministic filter over the listings; the AI shows up in the shop Q&A
+        and the deck-core builder.
       </p>
 
       <Section title="What this is, and who it is for">
@@ -117,22 +119,29 @@ export default function NotesPage() {
 
       <Section title="AI: what is real and which model">
         <p>
-          Natural-language search, the shop Q&A, and the deck-core builder all call a real
-          OpenAI-compatible chat endpoint from the server, keyed from server-only
-          environment variables (<code>AI_BASE_URL</code>, <code>AI_API_KEY</code>,{" "}
-          <code>AI_MODEL</code>). The model id is whatever <code>AI_MODEL</code> is set to
-          in the local <code>.env</code> — it is not hardcoded.
+          <strong>Search is not AI-powered.</strong> The search bar is a plain,
+          deterministic search over the listings — token scoring with a little local price
+          parsing (&ldquo;removal under $1&rdquo;) — computed in your browser, with no
+          network call and no model involved.
         </p>
         <p>
-          Search is one model call that parses intent into facets + keywords; the ranking
-          itself is deterministic and local, so results stay inspectable and reproducible.
-          The Q&A assistant is grounded on retrieved listings only and is told to name what
-          the listings do not establish. The builder&apos;s numbers are never trusted: every
-          line is repriced and re-clamped server-side against the real listing data.
+          The two AI surfaces are the <strong>shop Q&A</strong> and the{" "}
+          <strong>deck-core builder</strong>: both call a real OpenAI-compatible chat
+          endpoint from the server, keyed from server-only environment variables (
+          <code>AI_BASE_URL</code>, <code>AI_API_KEY</code>, <code>AI_MODEL</code>). The
+          model id is whatever <code>AI_MODEL</code> is set to in the local{" "}
+          <code>.env</code> — it is not hardcoded.
         </p>
         <p>
-          If the gateway is not configured, every AI surface renders an honest
-          &ldquo;AI unavailable&rdquo; state instead of a plausible-sounding fake answer.
+          The Q&A assistant is grounded on retrieved listings only (retrieved by the
+          same deterministic scorer as search) and is told to name what the listings do
+          not establish. The builder's numbers are never trusted: every line is
+          repriced and re-clamped server-side against the real listing data.
+        </p>
+        <p>
+          If the gateway is not configured, the AI surfaces render an honest
+          &ldquo;AI unavailable&rdquo; state instead of a plausible-sounding fake answer —
+          and search keeps working exactly the same, because it never needed the gateway.
         </p>
       </Section>
 

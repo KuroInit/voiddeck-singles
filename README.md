@@ -17,7 +17,7 @@ multiple singles to build decks.
 | **Buy** | Mobile-first grid of seeded + your own listings, facet filters, price sort, listing detail with a reference price line, simulated cart + demo checkout. |
 | **Sell** | Pick a card from the **full Riftbound card database** (1,188 printings across Origins / Proving Grounds / Spiritforged / Unleashed / Vendetta) so every listing maps to a valid card, then set condition, qty, pickup and your asking price (prefilled from the price snapshot). |
 | **Looking for** | WTB board with a budget per want; each want is auto-matched against active sale listings (`cheapest listing ≤ budget`), or honestly reported as "No matches yet". |
-| **Natural-language search** | "jinx alt art", "removal under $1", "chinese print teemo", "sealed origins" → one LLM intent-parsing call + deterministic local scoring over the catalogue, with a labelled keyword fallback. |
+| **Search** | A plain, deterministic search over the listings — token scoring plus local price parsing ("removal under $1"). Not AI-powered; works with the gateway disabled. |
 | **Shop Q&A** | Catalogue-grounded assistant that cites listing ids (`[L07]`) and says plainly what the listings do *not* establish (authenticity, market value, print run). |
 | **Deck-core builder** | "build me a Noxus aggro core under $30" → a composed cart from available singles, repriced server-side, with honest gaps. |
 | **Deck import** | Paste a `riftdecks.com` deck link → the decklist is parsed, every card mapped to the card DB, and stock availability shown per line ("buy what's in stock"). |
@@ -46,9 +46,10 @@ AI_API_KEY=    # bearer token
 AI_MODEL=      # chat model id
 ```
 
-With these unset the AI surfaces render an honest "AI unavailable — server env not set"
-state and `/api/search`, `/api/ask`, `/api/bundle` return `503 AI_NOT_CONFIGURED`. No
-fabricated answers are ever produced.
+With these unset the AI surfaces (shop Q&A, deck-core builder) render an honest
+"AI unavailable — server env not set" state and `/api/ask`, `/api/bundle` return
+`503 AI_NOT_CONFIGURED`. No fabricated answers are ever produced. Search is
+deterministic and always works.
 
 ## Data pipeline
 

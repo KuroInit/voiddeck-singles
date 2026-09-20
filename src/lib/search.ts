@@ -1,8 +1,9 @@
 /**
- * Server-side search: AI intent parsing + deterministic catalogue scoring.
- * No external deps; scoring is pure and stable.
+ * Deterministic catalogue search: plain keyword/price intent parsing plus a
+ * stable scoring pass over the listings. Pure and dependency-free — safe to
+ * import from client components (SearchBar) and server routes (ask/bundle
+ * retrieval) alike.
  */
-import { chatJSON } from "@/lib/ai";
 import type { Listing } from "@/data/listings";
 import { printingLabel } from "@/lib/rarity";
 
@@ -25,10 +26,8 @@ const FACETS = {
   rarity: ["common", "uncommon", "rare", "epic", "showcase"],
   language: ["en", "zh"],
   condition: ["nm", "lp", "mp", "psa9"],
-  type: ["legend", "unit", "spell", "rune", "sealed", "bulk"],
+  type: ["legend", "unit", "spell", "rune", "battlefield", "gear", "token", "sealed", "bulk"],
 } as const;
-
-const SYSTEM_PROMPT = `Return ONLY a JSON object matching this schema: {keywords: string[], printing?: string[], rarity?: string[], language?: string[], condition?: string[], type?: string[], maxPrice?: number, minPrice?: number, sort?: "relevance"|"price_asc"|"price_desc"}. keywords must preserve the user's own wording including slang and aliases (e.g. "jinx alt art", "chinese print", "sealed box", "removal", "bulk rares", "playset"). Use the facet arrays only when the user is explicit. Prices are in SGD. Legal facet values — printing: standard, alt_art, signature; rarity: common, uncommon, rare, epic, showcase; language: en, zh; condition: nm, lp, mp, psa9; type: legend, unit, spell, rune, sealed, bulk.`;
 
 function tokens(text: string): string[] {
   return text
@@ -78,57 +77,24 @@ function normText(words: string[]): string {
   return words.map((w) => stem(w)).join(" ");
 }
 
+const PRICE_STOPWORDS: Record<string, true> = {
+  under: true, below: true, over: true, above: true, less: true, more: true,
+  than: true, at: true, least: true, max: true, maximum: true, min: true,
+  minimum: true, sgd: true, usd: true,
+};
+
 export function fallbackIntent(q: string): SearchIntent {
-  return { keywords: tokens(q), sort: "relevance" };
-}
-
-/* ---------- defensive normalization of model output ---------- */
-
-function coerceStringArray(v: unknown, legal: readonly string[] | null): string[] | undefined {
-  if (!Array.isArray(v)) return undefined;
-  const out = v
-    .filter((x): x is string => typeof x === "string")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  const filtered = legal ? out.filter((s) => (legal as readonly string[]).includes(s)) : out;
-  return filtered.length ? filtered : undefined;
-}
-
-function coerceNumber(v: unknown): number | undefined {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number.parseFloat(v) : Number.NaN;
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
-
-export async function parseIntent(q: string): Promise<SearchIntent> {
-  const raw = await chatJSON(
-    [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: q },
-    ],
-    400
+  const s = q.toLowerCase();
+  const maxMatch = s.match(/(?:under|below|less than|<)\s*\$?\s*(\d+(?:\.\d+)?)/);
+  const minMatch = s.match(/(?:over|above|more than|at least|>)\s*\$?\s*(\d+(?:\.\d+)?)/);
+  const maxPrice = maxMatch ? Number.parseFloat(maxMatch[1]) : undefined;
+  const minPrice = minMatch ? Number.parseFloat(minMatch[1]) : undefined;
+  const keywords = tokens(q).filter(
+    (t) => !PRICE_STOPWORDS[t] && !/^\$?\d+(\.\d+)?$/.test(t)
   );
-  const obj = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-
-  const intent: SearchIntent = {
-    keywords: coerceStringArray(obj.keywords, null) ?? tokens(q),
-    sort: coerceStringArray(obj.sort, ["relevance", "price_asc", "price_desc"])?.[0] as
-      | SearchIntent["sort"]
-      | undefined,
-  };
-  const printing = coerceStringArray(obj.printing, FACETS.printing);
-  const rarity = coerceStringArray(obj.rarity, FACETS.rarity);
-  const language = coerceStringArray(obj.language, FACETS.language);
-  const condition = coerceStringArray(obj.condition, FACETS.condition);
-  const type = coerceStringArray(obj.type, FACETS.type);
-  if (printing) intent.printing = printing;
-  if (rarity) intent.rarity = rarity;
-  if (language) intent.language = language;
-  if (condition) intent.condition = condition;
-  if (type) intent.type = type;
-  const maxPrice = coerceNumber(obj.maxPrice);
-  const minPrice = coerceNumber(obj.minPrice);
-  if (maxPrice) intent.maxPrice = maxPrice;
-  if (minPrice) intent.minPrice = minPrice;
+  const intent: SearchIntent = { keywords, sort: "relevance" };
+  if (maxPrice !== undefined) intent.maxPrice = maxPrice;
+  if (minPrice !== undefined) intent.minPrice = minPrice;
   return intent;
 }
 

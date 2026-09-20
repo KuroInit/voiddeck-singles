@@ -1,5 +1,5 @@
 import { aiConfigured, chatJSON } from "@/lib/ai";
-import { parseIntent, fallbackIntent, scoreCatalogue } from "@/lib/search";
+import { fallbackIntent, scoreCatalogue } from "@/lib/search";
 import { getAllListings } from "@/lib/marketplace";
 import { getPriceFor, priceMeta, USD_SGD } from "@/lib/prices";
 
@@ -37,13 +37,8 @@ export async function POST(req: Request) {
 
   const catalogue = getAllListings().filter((l) => l.mode === "sale");
 
-  // Retrieval must work even when intent parsing fails.
-  let retrieval;
-  try {
-    retrieval = scoreCatalogue(catalogue, await parseIntent(q)).slice(0, 12);
-  } catch {
-    retrieval = scoreCatalogue(catalogue, fallbackIntent(q)).slice(0, 12);
-  }
+  // Deterministic retrieval: score the catalogue against the query tokens.
+  const retrieval = scoreCatalogue(catalogue, fallbackIntent(q)).slice(0, 12);
 
   const byId = new Map(catalogue.map((l) => [l.id, l]));
   let retrieved = retrieval

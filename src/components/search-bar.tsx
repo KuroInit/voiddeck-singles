@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { Listing } from "@/data/listings";
-import { getAllListings } from "@/lib/marketplace";
+import { getListings } from "@/lib/marketplace";
+import { fallbackIntent, scoreCatalogue } from "@/lib/search";
 
 const EXAMPLES = [
   "jinx alt art",
@@ -16,87 +16,54 @@ const EXAMPLES = [
   "bulk rares",
 ];
 
-type SearchMeta = { source: string; reasons: Record<string, string> } | null;
-
+/**
+ * Plain search over the for-sale listings: deterministic token scoring plus
+ * local price parsing ("removal under $1"), computed in the browser — no AI,
+ * no network call.
+ */
 export function SearchBar({
   onResults,
-  onError,
 }: {
-  onResults: (listings: Listing[] | null, meta: SearchMeta) => void;
-  onError?: (msg: string) => void;
+  onResults: (listings: Listing[] | null, reasons: Record<string, string>) => void;
 }) {
   const [q, setQ] = useState("");
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [active, setActive] = useState(false);
 
-  async function run(query: string) {
+  function run(query: string) {
     const trimmed = query.trim();
-    if (!trimmed || pending) return;
-    setPending(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q: trimmed }),
-      });
-      if (res.status === 503) {
-        const msg = "AI unavailable — server env not set";
-        setMessage(msg);
-        onError?.(msg);
-        onResults(null, null);
-        return;
-      }
-      if (!res.ok) {
-        const msg = "Search failed — try again";
-        setMessage(msg);
-        onError?.(msg);
-        onResults(null, null);
-        return;
-      }
-      const data = (await res.json()) as {
-        source: string;
-        results: { id: string; score: number; reason: string }[];
-      };
-      const all = getAllListings();
-      const byId = new Map(all.map((l: Listing) => [l.id, l]));
-      const reasons: Record<string, string> = {};
-      const listings: Listing[] = [];
-      for (const r of data.results) {
-        const listing = byId.get(r.id);
-        if (listing) {
-          listings.push(listing);
-          reasons[r.id] = r.reason;
-        }
-      }
-      setActive(true);
-      onResults(listings, { source: data.source, reasons });
-      if (listings.length === 0) {
-        setMessage("No listings matched — try fewer words");
-      } else if (data.source === "keyword-fallback") {
-        setMessage("keyword fallback — AI unavailable");
-      }
-    } catch {
-      const msg = "Search failed — network error";
-      setMessage(msg);
-      onError?.(msg);
-      onResults(null, null);
-    } finally {
-      setPending(false);
+    if (!trimmed) {
+      clear();
+      return;
     }
+    const scored = scoreCatalogue(getListings("sale"), fallbackIntent(trimmed));
+    const byId = new Map(getListings("sale").map((l) => [l.id, l]));
+    const reasons: Record<string, string> = {};
+    const results: Listing[] = [];
+    for (const s of scored.slice(0, 24)) {
+      const listing = byId.get(s.id);
+      if (!listing) continue;
+      results.push(listing);
+      reasons[s.id] = s.reason;
+    }
+    setActive(true);
+    onResults(results, reasons);
   }
 
   function clear() {
     setQ("");
-    setMessage(null);
     setActive(false);
-    onResults(null, null);
+    onResults(null, {});
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); run(q); }}>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(q);
+        }}
+      >
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -104,11 +71,22 @@ export function SearchBar({
           aria-label="Search listings"
           className="h-11 text-[15px] sm:h-12 sm:text-base"
         />
-        <Button type="submit" size="sm" className="h-11 px-4 text-[13px] sm:h-12 sm:px-5 sm:text-sm" disabled={pending || !q.trim()}>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-11 px-4 text-[13px] sm:h-12 sm:px-5 sm:text-sm"
+          disabled={!q.trim()}
+        >
           Search
         </Button>
         {active || q ? (
-          <Button type="button" size="sm" variant="ghost" className="h-11 px-3 text-[13px] sm:h-12 sm:text-sm" onClick={clear}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-11 px-3 text-[13px] sm:h-12 sm:text-sm"
+            onClick={clear}
+          >
             Clear
           </Button>
         ) : null}
@@ -128,14 +106,6 @@ export function SearchBar({
           </Badge>
         ))}
       </div>
-      {pending ? (
-        <div className="flex flex-col gap-1.5" aria-hidden>
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
-      ) : null}
-      {message ? <p className="text-[13px] text-zinc-500">{message}</p> : null}
     </div>
   );
 }
