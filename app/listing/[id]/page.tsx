@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { AskPanel } from "@/components/ask-panel";
 import { CardFrame } from "@/components/card-frame";
+import { FoilArt } from "@/components/foil-art";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -44,10 +45,12 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 function DetailArt({ listing }: { listing: Listing }) {
   const card = findCard(listing.cardCode);
   const [failed, setFailed] = useState(false);
-  const holo = isFoil(listing.cardCode);
-  if (card?.imageUrl && !failed) {
-    return (
-      <div className={cn("w-full max-w-xs shrink-0 overflow-hidden rounded-xl lg:max-w-sm", holo && "holo-sheen")}>
+  return (
+    <FoilArt
+      cardCode={listing.cardCode}
+      className="w-full max-w-xs shrink-0 rounded-xl lg:max-w-sm"
+    >
+      {card?.imageUrl && !failed ? (
         <img
           src={card.imageUrl}
           alt={listing.cardName}
@@ -55,17 +58,14 @@ function DetailArt({ listing }: { listing: Listing }) {
           className="aspect-[744/1039] w-full object-cover"
           onError={() => setFailed(true)}
         />
-      </div>
-    );
-  }
-  return (
-    <div className={cn("w-full max-w-xs shrink-0 overflow-hidden rounded-xl lg:max-w-sm", holo && "holo-sheen")}>
-      <CardFrame
-        name={listing.cardName}
-        rarity={listing.rarity}
-        className="aspect-[744/1039] w-full"
-      />
-    </div>
+      ) : (
+        <CardFrame
+          name={listing.cardName}
+          rarity={listing.rarity}
+          className="aspect-[744/1039] w-full"
+        />
+      )}
+    </FoilArt>
   );
 }
 

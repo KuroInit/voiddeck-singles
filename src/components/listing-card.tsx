@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CardFrame } from "@/components/card-frame";
+import { FoilArt } from "@/components/foil-art";
 import { findCard } from "@/data/cards";
 import type { Listing } from "@/data/listings";
 import { isFoil } from "@/lib/foil";
@@ -19,7 +20,7 @@ function ListingArt({ listing }: { listing: Listing }) {
   const showImg = Boolean(card?.imageUrl) && !failed;
   const holo = isFoil(listing.cardCode);
   return (
-    <div className={cn("relative", holo && "holo-sheen")}>
+    <FoilArt cardCode={listing.cardCode} className="w-full">
       {showImg ? (
         <img
           src={card!.imageUrl!}
@@ -48,7 +49,7 @@ function ListingArt({ listing }: { listing: Listing }) {
           {listing.type === "sealed" ? "Sealed" : "Bulk"}
         </span>
       ) : null}
-    </div>
+    </FoilArt>
   );
 }
 
