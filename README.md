@@ -1,6 +1,6 @@
 # Voiddeck Singles
 
-**The void-deck card market for Runeterra — a local-only demo.**
+**The void-deck card market for Riftbound — a local-only demo.**
 
 An AI-enabled second-hand marketplace for **Riftbound TCG singles** aimed at Singapore
 buyers and sellers: people chasing rare Showcase / Signature printings, and players buying

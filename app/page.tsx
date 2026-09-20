@@ -26,8 +26,8 @@ export default function Home() {
           Riftbound singles, <span className="text-primary">Singapore</span>
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
-          Buy, sell, and look for Runeterra cards. Chatty search and a grounded shop
-          assistant included.
+          Buy, sell, and look for Riftbound cards. Plain search, facet filters, and a
+          grounded shop assistant included.
         </p>
       </header>
 

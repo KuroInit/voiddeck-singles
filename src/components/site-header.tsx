@@ -47,7 +47,7 @@ export function SiteHeader() {
               Voiddeck <span className="text-amber-400">Singles</span>
             </span>
             <span className="hidden text-xs text-zinc-500 sm:block">
-              the void-deck card market for Runeterra
+              the void-deck card market for Riftbound
             </span>
           </span>
         </Link>

@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Voiddeck Singles — Riftbound TCG singles, Singapore",
   description:
-    "The void-deck card market for Runeterra. Buy, sell, and look for Riftbound singles in Singapore. Demo — all listings are fictional.",
+    "The void-deck card market for Riftbound. Buy, sell, and look for Riftbound singles in Singapore. Demo — all listings are fictional.",
 };
 
 export const viewport = {

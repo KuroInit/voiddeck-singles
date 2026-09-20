@@ -162,7 +162,7 @@ export function DeckImportSheet({
               <Textarea
                 id="deck-pasted"
                 rows={5}
-                placeholder={"4 Jinx\n2 Legends Runeterra\n…"}
+                placeholder={"4 Jinx\n2 Shield of Dawn\n…"}
                 value={pasted}
                 onChange={(e) => setPasted(e.target.value)}
               />
