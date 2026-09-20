@@ -76,10 +76,11 @@ type BilgewaterRow = {
 /** Primary source: bilgewatermarket.com public API, crawled via Playwright. */
 async function fetchBilgewater(
   context: BrowserContext
-): Promise<Record<string, { usd: number }>> {
+): Promise<{ prices: Record<string, { usd: number }>; foils: string[] }> {
   const request = context.request;
   const seen = new Set<string>(); // duplicate page rows
   const ranked: Record<string, { rank: number; usd: number }> = {};
+  const foilSet = new Set<string>(); // codes with a "foiled" printing
   let pageNo = 1;
 
   while (pageNo <= MAX_BILGEWATER_PAGES) {
@@ -106,10 +107,17 @@ async function fetchBilgewater(
       const key = `${it.card_id}|${it.print_variation ?? ""}`;
       if (!it.card_id || seen.has(key)) continue;
       seen.add(key);
+      const code = cardIdToCode(it.card_id);
+      const variation = (it.print_variation ?? "").toLowerCase();
+      // "foiled" rows are explicit foil printings; "signature" rows are the
+      // overnumbered Signature Showcase printings (e.g. OGN-299*), foil by
+      // construction.
+      if (variation.startsWith("foiled") || variation.startsWith("signature")) {
+        foilSet.add(code);
+      }
       if (!it.en_card) continue; // CN-only row; we want EN printings
       const usd = it.markets?.us?.price;
       if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) continue;
-      const code = cardIdToCode(it.card_id);
       const rank = variationRank(it.print_variation);
       const cur = ranked[code];
       if (!cur || rank < cur.rank || (rank === cur.rank && usd < cur.usd)) {
@@ -128,11 +136,13 @@ async function fetchBilgewater(
 
   const out: Record<string, { usd: number }> = {};
   for (const [code, { usd }] of Object.entries(ranked)) out[code] = { usd };
-  return out;
+  return { prices: out, foils: [...foilSet].sort() };
 }
 
 /** Fallback source: riftboundcardlist.com server-rendered set tables. */
-async function fetchRbcl(context: BrowserContext): Promise<Record<string, { usd: number }>> {
+async function fetchRbcl(
+  context: BrowserContext
+): Promise<{ prices: Record<string, { usd: number }>; foils: string[] }> {
   const page: Page = await context.newPage();
   page.setDefaultTimeout(PER_PAGE_TIMEOUT_MS);
   const SETS = [
@@ -143,6 +153,7 @@ async function fetchRbcl(context: BrowserContext): Promise<Record<string, { usd:
     "vendetta",
   ];
   const rows: Record<string, { usd: number; foil: boolean }> = {};
+  const foilSet = new Set<string>(); // codes whose printing label contains "(foil)"
   const failed: string[] = [];
 
   for (const set of SETS) {
@@ -173,6 +184,7 @@ async function fetchRbcl(context: BrowserContext): Promise<Record<string, { usd:
         return out;
       })) as { code: string; usd: number; foil: boolean }[];
       for (const { code, usd, foil } of extracted) {
+        if (foil) foilSet.add(code);
         const cur = rows[code];
         // prefer non-foil base printing; else cheaper
         if (!cur || (cur.foil && !foil) || (cur.foil === foil && usd < cur.usd)) {
@@ -190,7 +202,7 @@ async function fetchRbcl(context: BrowserContext): Promise<Record<string, { usd:
   const out: Record<string, { usd: number }> = {};
   for (const [code, { usd }] of Object.entries(rows)) out[code] = { usd };
   if (failed.length > 0) console.warn(`[fetch-prices] rbcl failures: ${failed.join("; ")}`);
-  return out;
+  return { prices: out, foils: [...foilSet].sort() };
 }
 
 /**
@@ -271,13 +283,16 @@ async function fetchBilgewaterCardPages(
 async function main(): Promise<void> {
   let source: "bilgewater-market" | "tcgplayer-mirror";
   let prices: Record<string, { usd: number }> = {};
+  const foilCodes = new Set<string>();
   const failures: string[] = [];
 
   const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ userAgent: UA });
     try {
-      prices = await fetchBilgewater(context);
+      const { prices: feed, foils } = await fetchBilgewater(context);
+      prices = feed;
+      for (const code of foils) foilCodes.add(code);
     } catch (err) {
       failures.push(`bilgewatermarket API: ${String(err).slice(0, 200)}`);
       prices = {};
@@ -302,7 +317,10 @@ async function main(): Promise<void> {
       if (Object.keys(prices).length > 0) {
         failures.push("bilgewatermarket API delivered < 100 codes; falling back");
       }
-      prices = await fetchRbcl(context);
+      prices = await fetchRbcl(context).then(({ prices: p, foils }) => {
+        for (const code of foils) foilCodes.add(code);
+        return p;
+      });
       source = "tcgplayer-mirror";
     }
     await context.close();
@@ -319,10 +337,21 @@ async function main(): Promise<void> {
   };
   await writeFile(OUT, JSON.stringify(payload), "utf8");
 
+  const foilOut = path.resolve(__dirname, "../src/data/foil.json");
+  const foilPayload = {
+    meta: { source: payload.meta.source, asOf: payload.meta.asOf },
+    codes: [...foilCodes].sort(),
+  };
+  await writeFile(foilOut, JSON.stringify(foilPayload), "utf8");
+
   const codes = Object.keys(prices);
   console.log(`\n[fetch-prices] source: ${payload.meta.source}`);
   console.log(`[fetch-prices] asOf: ${payload.meta.asOf}`);
   console.log(`[fetch-prices] priced cardCodes: ${codes.length}`);
+  console.log(`[fetch-prices] foil cardCodes: ${foilPayload.codes.length}`);
+  console.log(
+    `[fetch-prices] foil samples: ${JSON.stringify(foilPayload.codes.slice(0, 8))}`
+  );
   console.log(
     `[fetch-prices] samples: ${JSON.stringify(
       Object.fromEntries(codes.slice(0, 5).map((c) => [c, prices[c]]))

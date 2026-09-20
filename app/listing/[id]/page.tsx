@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { findCard } from "@/data/cards";
 import type { Listing } from "@/data/listings";
 import { addToCart, getAllListings } from "@/lib/marketplace";
+import { isFoil } from "@/lib/foil";
 import { bump, pressable } from "@/lib/motion";
 import {
   conditionLabel,
@@ -24,6 +25,7 @@ import {
   typeLabel,
 } from "@/lib/rarity";
 import { getPriceFor } from "@/lib/prices";
+import { cn } from "@/lib/utils";
 
 const SOURCE_LABELS: Record<string, string> = {
   "bilgewater-market": "Bilgewater Market",
@@ -32,9 +34,9 @@ const SOURCE_LABELS: Record<string, string> = {
 
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-xs text-zinc-500">{label}</span>
-      <span className="text-right text-sm text-zinc-200">{value}</span>
+    <div className="flex items-baseline justify-between gap-3 py-1">
+      <span className="text-[13px] text-zinc-500 sm:text-sm">{label}</span>
+      <span className="text-right text-sm text-zinc-200 sm:text-[15px]">{value}</span>
     </div>
   );
 }
@@ -42,23 +44,28 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
 function DetailArt({ listing }: { listing: Listing }) {
   const card = findCard(listing.cardCode);
   const [failed, setFailed] = useState(false);
+  const holo = isFoil(listing.cardCode);
   if (card?.imageUrl && !failed) {
     return (
-      <img
-        src={card.imageUrl}
-        alt={listing.cardName}
-        loading="lazy"
-        className="aspect-[744/1039] w-full max-w-xs rounded-xl object-cover"
-        onError={() => setFailed(true)}
-      />
+      <div className={cn("w-full max-w-xs shrink-0 overflow-hidden rounded-xl lg:max-w-sm", holo && "holo-sheen")}>
+        <img
+          src={card.imageUrl}
+          alt={listing.cardName}
+          loading="lazy"
+          className="aspect-[744/1039] w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      </div>
     );
   }
   return (
-    <CardFrame
-      name={listing.cardName}
-      rarity={listing.rarity}
-      className="aspect-[744/1039] w-full max-w-xs rounded-xl"
-    />
+    <div className={cn("w-full max-w-xs shrink-0 overflow-hidden rounded-xl lg:max-w-sm", holo && "holo-sheen")}>
+      <CardFrame
+        name={listing.cardName}
+        rarity={listing.rarity}
+        className="aspect-[744/1039] w-full"
+      />
+    </div>
   );
 }
 
@@ -115,12 +122,12 @@ export default function ListingPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
-      <Link href="/" className="text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+      <Link href="/" className="text-[13px] text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline">
         ← Back to the market
       </Link>
 
-      <div className="flex flex-col gap-5 sm:flex-row">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <DetailArt listing={listing} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -137,9 +144,9 @@ export default function ListingPage() {
                 </Badge>
               ) : null}
             </div>
-            <h1 className="text-xl font-semibold text-zinc-100">{listing.cardName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-100 sm:text-3xl">{listing.cardName}</h1>
             {card ? (
-              <p className="text-xs text-zinc-500">
+              <p className="text-[13px] text-zinc-500 sm:text-sm">
                 {card.fullName !== card.name ? `${card.fullName} · ` : ""}
                 {card.cardSet} · {card.cardNumber}
               </p>
@@ -162,9 +169,9 @@ export default function ListingPage() {
             </div>
           </div>
 
-          <p className="text-2xl font-semibold text-amber-400">
-            {isWtb ? `Budget S$${listing.budgetSgd?.toFixed(2)}` : `S$${listing.priceSgd.toFixed(2)}`}
-            <span className="ml-2 text-xs font-normal text-zinc-500">
+          <p className="text-3xl font-semibold tracking-tight text-amber-400 tabular-nums sm:text-4xl">
+            {isWtb ? `S$${listing.budgetSgd?.toFixed(2)}` : `S$${listing.priceSgd.toFixed(2)}`}
+            <span className="ml-2 text-[13px] font-normal text-zinc-500 sm:text-sm">
               {isWtb ? "want to buy" : "asking price, not market value"}
             </span>
           </p>

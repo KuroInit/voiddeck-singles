@@ -37,8 +37,8 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
         <SiteHeader />
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-border/60 py-6 text-xs text-muted-foreground">
-          <div className="mx-auto max-w-6xl px-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="border-t border-border/60 bg-zinc-950/60 py-6 text-[13px] text-muted-foreground sm:py-8">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <Link href="/notes" className="hover:text-foreground underline-offset-2 hover:underline">
                 Notes

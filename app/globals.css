@@ -128,3 +128,43 @@
     @apply font-sans;
   }
 }
+
+/* --- Holo shimmer: applied to card art whose printing has a foil variant --- */
+.holo-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.holo-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.22) 44%,
+    rgba(251, 191, 36, 0.28) 50%,
+    rgba(139, 92, 246, 0.18) 56%,
+    rgba(255, 255, 255, 0.22) 60%,
+    transparent 72%
+  );
+  background-size: 260% 260%;
+  animation: holo-sweep 3.4s linear infinite;
+}
+@keyframes holo-sweep {
+  0% {
+    background-position: 130% 0;
+  }
+  100% {
+    background-position: -140% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .holo-sheen::after {
+    animation: none;
+    background-position: 46% 0;
+  }
+}

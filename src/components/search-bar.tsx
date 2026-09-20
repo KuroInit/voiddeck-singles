@@ -96,24 +96,19 @@ export function SearchBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          run(q);
-        }}
-      >
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); run(q); }}>
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search the market — try a card name or a budget"
           aria-label="Search listings"
+          className="h-11 text-[15px] sm:h-12 sm:text-base"
         />
-        <Button type="submit" size="sm" disabled={pending || !q.trim()}>
+        <Button type="submit" size="sm" className="h-11 px-4 text-[13px] sm:h-12 sm:px-5 sm:text-sm" disabled={pending || !q.trim()}>
           Search
         </Button>
         {active || q ? (
-          <Button type="button" size="sm" variant="ghost" onClick={clear}>
+          <Button type="button" size="sm" variant="ghost" className="h-11 px-3 text-[13px] sm:h-12 sm:text-sm" onClick={clear}>
             Clear
           </Button>
         ) : null}
@@ -123,7 +118,7 @@ export function SearchBar({
           <Badge
             key={ex}
             variant="outline"
-            className="shrink-0 cursor-pointer border-zinc-700 text-[11px] text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+            className="shrink-0 cursor-pointer border-zinc-700 px-2.5 py-1 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
             onClick={() => {
               setQ(ex);
               run(ex);
@@ -140,7 +135,7 @@ export function SearchBar({
           <Skeleton className="h-4 w-2/3" />
         </div>
       ) : null}
-      {message ? <p className="text-xs text-zinc-500">{message}</p> : null}
+      {message ? <p className="text-[13px] text-zinc-500">{message}</p> : null}
     </div>
   );
 }

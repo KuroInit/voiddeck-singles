@@ -20,26 +20,26 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-5">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
+      <header className="mb-5 sm:mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           Riftbound singles, <span className="text-primary">Singapore</span>
         </h1>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
           Buy, sell, and look for Runeterra cards. Chatty search and a grounded shop
           assistant included.
         </p>
       </header>
 
       <Tabs value={tab} onValueChange={handleTabChange} className="gap-3">
-        <TabsList className="w-full">
-          <TabsTrigger value="buy" className="flex-1">
+        <TabsList className="h-11 w-full sm:h-12">
+          <TabsTrigger value="buy" className="flex-1 text-sm sm:text-[15px]">
             Buy
           </TabsTrigger>
-          <TabsTrigger value="sell" className="flex-1">
+          <TabsTrigger value="sell" className="flex-1 text-sm sm:text-[15px]">
             Sell
           </TabsTrigger>
-          <TabsTrigger value="looking" className="flex-1">
+          <TabsTrigger value="looking" className="flex-1 text-sm sm:text-[15px]">
             Looking for
           </TabsTrigger>
         </TabsList>
