@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Card } from "@/data/cards";
-import type { Listing } from "@/data/listings";
-import { addWtbPost, bestListingFor, getWtbPosts } from "@/lib/marketplace";
+import type { CatalogFacets, WantPost } from "@/components/home-tabs";
 import { revealStagger, bump } from "@/lib/motion";
 import { CardPicker } from "@/components/card-picker";
 import { Button } from "@/components/ui/button";
@@ -15,31 +15,41 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-export function WtbBoard() {
-  const [posts, setPosts] = useState<Listing[]>([]);
+export function WtbBoard({
+  posts,
+  catalog,
+}: {
+  posts: WantPost[];
+  catalog: CatalogFacets;
+}) {
+  const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picked, setPicked] = useState<Card | null>(null);
   const [qty, setQty] = useState(1);
   const [budget, setBudget] = useState("");
   const [note, setNote] = useState("");
+  const [pendingPost, setPendingPost] = useState<{
+    cardCode: string;
+    cardName: string;
+    qty: number;
+    budgetSgd: number;
+    note: string;
+  } | null>(null);
+  const [handle, setHandle] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const badgeEls = useRef<Map<string, HTMLElement>>(new Map());
   const bumped = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    setPosts(getWtbPosts());
-  }, []);
 
   useEffect(() => {
     if (posts.length > 0 && boardRef.current) revealStagger(boardRef.current);
   }, [posts]);
 
   // Bump each match badge once, the first time it mounts with a match.
+  // The match itself was computed on the server and arrives on the post.
   useEffect(() => {
     for (const p of posts) {
-      if (p.cardCode === null || bumped.current.has(p.id)) continue;
-      const match = bestListingFor(p.cardCode, p.budgetSgd);
-      if (!match) continue;
+      if (p.cardCode === null || !p.match || bumped.current.has(p.id)) continue;
       const el = badgeEls.current.get(p.id);
       if (el) {
         bumped.current.add(p.id);
@@ -54,21 +64,73 @@ export function WtbBoard() {
   const canPost =
     picked !== null && Number.isFinite(budgetNum) && budgetNum > 0 && qty >= 1;
 
-  const submitWant = () => {
+  const submitWant = async () => {
     if (!picked || !canPost) return;
-    const post = addWtbPost({
-      cardName: picked.fullName,
+    const payload = {
+      kind: "want" as const,
       cardCode: picked.cardCode,
+      cardName: picked.fullName,
       qty: Math.max(1, Math.floor(qty) || 1),
       budgetSgd: Math.round(budgetNum * 100) / 100,
       note,
+    };
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
-    toast.success("Want posted — visible in your browser");
-    setPosts(getWtbPosts());
+    if (res.status === 401) {
+      // No current user — prompt the inline mini-signup, then retry.
+      setPendingPost(payload);
+      return;
+    }
+    if (!res.ok) {
+      toast.error("Could not post the want — try again");
+      return;
+    }
+    toast.success("Want posted — visible in the board");
     setPicked(null);
     setBudget("");
     setNote("");
-    void post;
+    setPendingPost(null);
+    router.refresh();
+  };
+
+  const signUp = async (retry: NonNullable<typeof pendingPost>) => {
+    const trimmed = handle.trim();
+    if (!trimmed || signingIn) return;
+    setSigningIn(true);
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: trimmed }),
+      });
+      if (!res.ok) {
+        toast.error("Could not create that handle — try another");
+        return;
+      }
+      toast.success(`Signed in as @${trimmed}`);
+      setHandle("");
+      setPendingPost(null);
+      router.refresh();
+      const post = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(retry),
+      });
+      if (post.ok) {
+        toast.success("Want posted — visible in the board");
+        setPicked(null);
+        setBudget("");
+        setNote("");
+        router.refresh();
+      } else {
+        toast.error("Could not post the want — try again");
+      }
+    } finally {
+      setSigningIn(false);
+    }
   };
 
   return (
@@ -80,14 +142,14 @@ export function WtbBoard() {
         <Button onClick={() => setPickerOpen(true)}>Post a want</Button>
       </div>
 
-      <CardPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={pickCard} />
+      <CardPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={pickCard} facets={catalog} />
 
       {picked ? (
         <form
           className="space-y-3 rounded-xl border border-border p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            submitWant();
+            void submitWant();
           }}
         >
           <div className="text-sm font-medium">{picked.fullName}</div>
@@ -133,6 +195,29 @@ export function WtbBoard() {
         </form>
       ) : null}
 
+      {pendingPost ? (
+        <div className="space-y-2 rounded-xl border border-amber-700/50 p-4">
+          <p className="text-sm text-amber-400">
+            Post as a local demo account — one click, no password.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="pick a handle, e.g. voiddeck_reg"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              aria-label="Handle for your local demo account"
+            />
+            <Button
+              type="button"
+              disabled={!handle.trim() || signingIn}
+              onClick={() => void signUp(pendingPost)}
+            >
+              Sign in
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <p className="text-xs text-muted-foreground">
         A want for a category (e.g. &ldquo;25 random OGN rares&rdquo;) has no specific
         card, so it can&rsquo;t auto-match singles — it stays &ldquo;No matches
@@ -146,16 +231,24 @@ export function WtbBoard() {
           </p>
         ) : (
           posts.map((post) => {
-            const match =
-              post.cardCode !== null
-                ? bestListingFor(post.cardCode, post.budgetSgd)
-                : null;
+            const match = post.match;
             return (
               <WtbCard key={post.id} data-anim="item" className="py-3">
                 <CardContent className="px-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium">{post.cardName}</div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-medium">{post.cardName}</span>
+                        {post.source === "ai_proposed" ? (
+                          <Badge
+                            variant="outline"
+                            className="border-sky-800 text-[10px] font-normal text-sky-400"
+                            title="Proposed by the deck-import assistant and confirmed by a user"
+                          >
+                            proposed by assistant
+                          </Badge>
+                        ) : null}
+                      </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         qty {post.qty} · budget{" "}
                         {post.budgetSgd !== undefined

@@ -17,6 +17,7 @@ export type Listing = {
   mode: "sale" | "wtb";
   source: "seed" | "user";
   budgetSgd?: number;      // wtb only
+  imageUrl?: string | null; // joined from cards.image_url by the data layer; null when cardCode is null or unknown
 };
 
 // cardCode backfilled offline from src/data/cards.json:

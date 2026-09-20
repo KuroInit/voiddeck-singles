@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CardFrame } from "@/components/card-frame";
 import { FoilArt } from "@/components/foil-art";
-import { findCard } from "@/data/cards";
 import type { Listing } from "@/data/listings";
 import { isFoil } from "@/lib/foil";
 import { pressable } from "@/lib/motion";
@@ -15,15 +14,14 @@ import { conditionLabel, printingLabel, rarityClass } from "@/lib/rarity";
 import { cn } from "@/lib/utils";
 
 function ListingArt({ listing }: { listing: Listing }) {
-  const card = findCard(listing.cardCode);
   const [failed, setFailed] = useState(false);
-  const showImg = Boolean(card?.imageUrl) && !failed;
+  const showImg = Boolean(listing.imageUrl) && !failed;
   const holo = isFoil(listing.cardCode);
   return (
     <FoilArt cardCode={listing.cardCode} className="w-full">
       {showImg ? (
         <img
-          src={card!.imageUrl!}
+          src={listing.imageUrl!}
           alt={listing.cardName}
           loading="lazy"
           className="aspect-[744/1039] w-full object-cover"

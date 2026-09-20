@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { getStats } from "@/lib/marketplace";
 import { CARDS } from "@/data/cards";
-import { SEED_LISTINGS } from "@/data/listings";
 import { priceMeta, USD_SGD } from "@/lib/prices";
 
 export const metadata: Metadata = {
@@ -31,10 +31,11 @@ function Section({
   );
 }
 
-export default function NotesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NotesPage() {
+  const stats = await getStats();
   const meta = priceMeta();
-  const saleCount = SEED_LISTINGS.filter((l) => l.mode === "sale").length;
-  const wtbCount = SEED_LISTINGS.filter((l) => l.mode === "wtb").length;
   const sets = Array.from(new Set(CARDS.map((c) => c.cardSet))).sort();
   const sourceLabel =
     meta.source === "bilgewater-market" ? "Bilgewater Market" : "TCGplayer mirror";
@@ -65,19 +66,23 @@ export default function NotesPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>
             All sellers, handles, stock counts, pickup notes and asking prices are{" "}
-            <strong>fictional demo data</strong>. {saleCount} seeded sale listings and{" "}
-            {wtbCount} seeded want-to-buy posts ship with the app.
+            <strong>fictional demo data</strong>. {stats.saleCount} sale listings and{" "}
+            {stats.wantCount} want-to-buy posts (seeded, plus anything you post) live
+            in the local database.
           </li>
           <li>
             <strong>Checkout is simulated</strong> and labelled as such — no payment is
             processed, no order leaves your browser.
           </li>
           <li>
-            Listings and wants you create are stored <strong>only in your browser</strong>{" "}
-            (<code>localStorage</code>: <code>vds_user_listings</code>,{" "}
-            <code>vds_user_wtb</code>, <code>vds_cart</code>) and are labelled
-            &ldquo;demo — stored in your browser&rdquo;. There is no auth and no server
-            database, so reviewers always see the seeded marketplace.
+            Listings, wants and posts you create are stored in the{" "}
+            <strong>local database file</strong> (<code>data/vds.db</code>, embedded
+            SQLite via Node&apos;s built-in <code>node:sqlite</code>) alongside the
+            seeded marketplace, and are labelled &ldquo;demo — stored in your local
+            database&rdquo;. The cart alone stays in your browser (<code>localStorage</code>
+            : <code>vds_cart</code>). Signing in creates a handle-only local demo
+            account — {stats.userCount} demo account{stats.userCount === 1 ? "" : "s"} so
+            far, no passwords.
           </li>
           <li>
             Seeded singles are an <strong>Origins (OGN) subset</strong>. Card{" "}
@@ -90,8 +95,8 @@ export default function NotesPage() {
       <Section title="Data sources and licences">
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong>Card database</strong> — {CARDS.length.toLocaleString()} printings from
-            the <code>riftbound-cards</code> fan dataset (code MIT; card data © Riot
+            <strong>Card database</strong> — {stats.cardCount.toLocaleString()} printings
+            from the <code>riftbound-cards</code> fan dataset (code MIT; card data © Riot
             Games), covering {sets.join(", ")}. It powers the Sell / Looking-for pickers
             and deck import, so every listing maps to a valid card.
           </li>
@@ -104,10 +109,14 @@ export default function NotesPage() {
           <li>
             <strong>Reference prices</strong> come from a dated snapshot:{" "}
             {sourceLabel}
-            {meta.asOf ? `, ${meta.asOf}` : ""}. The app never scrapes prices at runtime —
-            Bilgewater Market&apos;s API sits behind Firebase App Check and reCAPTCHA, so
-            the snapshot is produced offline by a local Playwright script and committed
-            with its <code>asOf</code> date. USD → SGD uses a fixed demo rate of{" "}
+            {meta.asOf ? `, ${meta.asOf}` : ""}. The snapshot is stored per printing
+            variation ({stats.variationCount.toLocaleString()} variation rows,{" "}
+            {stats.foilCount.toLocaleString()} of them foil) and rendered{" "}
+            <em>jankrats-style</em> — one outbound link per variation — on listing
+            pages. The app never scrapes prices at runtime — Bilgewater Market&apos;s
+            API sits behind Firebase App Check and reCAPTCHA, so the snapshot is
+            produced offline by a local Playwright script and committed with its{" "}
+            <code>asOf</code> date. USD → SGD uses a fixed demo rate of{" "}
             {USD_SGD} displayed with &ldquo;≈&rdquo;.
           </li>
           <li>
@@ -135,7 +144,7 @@ export default function NotesPage() {
         <p>
           The Q&A assistant is grounded on retrieved listings only (retrieved by the
           same deterministic scorer as search) and is told to name what the listings do
-          not establish. The builder's numbers are never trusted: every line is
+          not establish. Builder numbers are never trusted: every line is
           repriced and re-clamped server-side against the real listing data.
         </p>
         <p>
@@ -152,8 +161,9 @@ export default function NotesPage() {
             and the brief&apos;s core flow must not require login.
           </li>
           <li>
-            <strong>Auth / accounts</strong> — per the brief, no login wall; user content is
-            browser-local instead.
+            <strong>Auth / accounts</strong> — no login wall and no passwords; sign-in is
+            a one-click local demo handle, and posts are attributed to it without any
+            access control.
           </li>
           <li>
             <strong>Live price refresh</strong> — the only public price source is

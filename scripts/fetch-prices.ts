@@ -26,7 +26,9 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
 
+// Prices + foil feed back DBCore's fallbacks; variations feeds card_variations.
 const OUT = path.resolve(__dirname, "../src/data/prices.json");
+const VARIATIONS_OUT = path.resolve(__dirname, "../src/data/variations.json");
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 const PER_PAGE_TIMEOUT_MS = 20_000;
@@ -73,14 +75,23 @@ type BilgewaterRow = {
   markets?: { us?: { price?: number | null } | null } | null;
 };
 
+/** One card_variations row: Bilgewater Market USD price, null = unpriced. */
+type VariationRow = { variation: string; usd: number | null };
+
 /** Primary source: bilgewatermarket.com public API, crawled via Playwright. */
 async function fetchBilgewater(
   context: BrowserContext
-): Promise<{ prices: Record<string, { usd: number }>; foils: string[] }> {
+): Promise<{
+  prices: Record<string, { usd: number }>;
+  foils: string[];
+  variations: Record<string, VariationRow[]>;
+}> {
   const request = context.request;
-  const seen = new Set<string>(); // duplicate page rows
-  const ranked: Record<string, { rank: number; usd: number }> = {};
-  const foilSet = new Set<string>(); // codes with a "foiled" printing
+  const seen = new Set<string>(); // duplicate page rows (card_id|variation)
+  // code -> variation -> row (first row wins on duplicate variation keys).
+  // EVERY feed row lands here, including unpriced and CN-only rows, so the
+  // variations map reflects the full per-code print_variation spread.
+  const byCode = new Map<string, Map<string, VariationRow & { rank: number; enCard: boolean }>>();
   let pageNo = 1;
 
   while (pageNo <= MAX_BILGEWATER_PAGES) {
@@ -108,35 +119,70 @@ async function fetchBilgewater(
       if (!it.card_id || seen.has(key)) continue;
       seen.add(key);
       const code = cardIdToCode(it.card_id);
-      const variation = (it.print_variation ?? "").toLowerCase();
-      // "foiled" rows are explicit foil printings; "signature" rows are the
-      // overnumbered Signature Showcase printings (e.g. OGN-299*), foil by
-      // construction.
-      if (variation.startsWith("foiled") || variation.startsWith("signature")) {
-        foilSet.add(code);
-      }
-      if (!it.en_card) continue; // CN-only row; we want EN printings
-      const usd = it.markets?.us?.price;
-      if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) continue;
-      const rank = variationRank(it.print_variation);
-      const cur = ranked[code];
-      if (!cur || rank < cur.rank || (rank === cur.rank && usd < cur.usd)) {
-        ranked[code] = { rank, usd: Math.round(usd * 100) / 100 };
+      const variation = (it.print_variation ?? "").toLowerCase() || "normal";
+      const rawUsd = it.markets?.us?.price;
+      const usd =
+        typeof rawUsd === "number" && Number.isFinite(rawUsd) && rawUsd > 0
+          ? Math.round(rawUsd * 100) / 100
+          : null;
+      let rows = byCode.get(code);
+      if (!rows) byCode.set(code, (rows = new Map()));
+      if (!rows.has(variation)) {
+        rows.set(variation, { variation, usd, rank: variationRank(it.print_variation), enCard: !!it.en_card });
       }
     }
 
     const more = json.hasMore === true && items.length > 0;
     console.log(
-      `[fetch-prices] bilgewater page ${pageNo}: +${items.length} rows (total unique codes: ${Object.keys(ranked).length})`
+      `[fetch-prices] bilgewater page ${pageNo}: +${items.length} rows (total unique codes: ${byCode.size})`
     );
     if (!more) break;
     pageNo++;
     await delay(PAGE_DELAY_MS);
   }
 
+  // prices.json contract unchanged: EN rows with a usable price, cheapest /
+  // lowest-rank variation wins.
+  const ranked: Record<string, { rank: number; usd: number }> = {};
+  for (const [code, rows] of byCode) {
+    for (const r of rows.values()) {
+      if (!r.enCard || r.usd === null) continue;
+      const cur = ranked[code];
+      if (!cur || r.rank < cur.rank || (r.rank === cur.rank && r.usd < cur.usd)) {
+        ranked[code] = { rank: r.rank, usd: r.usd };
+      }
+    }
+  }
   const out: Record<string, { usd: number }> = {};
   for (const [code, { usd }] of Object.entries(ranked)) out[code] = { usd };
-  return { prices: out, foils: [...foilSet].sort() };
+
+  // card_variations payload: every row, sorted normal → foiled → showcase →
+  // signature → promo (same rank order as VARIATION_RANK). Restricted to
+  // cardCodes known to cards.json so seeding's FK to cards holds.
+  const known = new Set(cardsJson.map((c) => c.cardCode));
+  const variations: Record<string, VariationRow[]> = {};
+  let variationRowCount = 0;
+  for (const [code, rows] of byCode) {
+    if (!known.has(code)) continue;
+    variations[code] = [...rows.values()]
+      .sort((a, b) => a.rank - b.rank || a.variation.localeCompare(b.variation))
+      .map(({ variation, usd }) => ({ variation, usd }));
+    variationRowCount += variations[code].length;
+  }
+  console.log(
+    `[fetch-prices] variations: ${Object.keys(variations).length} codes / ${variationRowCount} rows (feed codes dropped as unknown to cards.json: ${byCode.size - Object.keys(variations).length})`
+  );
+
+  // "foiled" rows are explicit foil printings; "signature" rows are the
+  // overnumbered Signature Showcase printings (e.g. OGN-299*), foil by
+  // construction. Derived from the variation rows themselves.
+  const foilSet = new Set<string>();
+  for (const [code, rows] of byCode) {
+    for (const v of rows.keys()) {
+      if (v.startsWith("foiled") || v.startsWith("signature")) foilSet.add(code);
+    }
+  }
+  return { prices: out, foils: [...foilSet].sort(), variations };
 }
 
 /** Fallback source: riftboundcardlist.com server-rendered set tables. */
@@ -283,6 +329,7 @@ async function fetchBilgewaterCardPages(
 async function main(): Promise<void> {
   let source: "bilgewater-market" | "tcgplayer-mirror";
   let prices: Record<string, { usd: number }> = {};
+  let variations: Record<string, VariationRow[]> = {};
   const foilCodes = new Set<string>();
   const failures: string[] = [];
 
@@ -290,8 +337,9 @@ async function main(): Promise<void> {
   try {
     const context = await browser.newContext({ userAgent: UA });
     try {
-      const { prices: feed, foils } = await fetchBilgewater(context);
+      const { prices: feed, foils, variations: feedVariations } = await fetchBilgewater(context);
       prices = feed;
+      variations = feedVariations;
       for (const code of foils) foilCodes.add(code);
     } catch (err) {
       failures.push(`bilgewatermarket API: ${String(err).slice(0, 200)}`);
@@ -344,11 +392,25 @@ async function main(): Promise<void> {
   };
   await writeFile(foilOut, JSON.stringify(foilPayload), "utf8");
 
+  // card_variations feed for the DB. Populated only from bilgewater feed rows
+  // (never fabricated); empty map when bilgewater delivered nothing — DBCore
+  // then falls back to prices.json/foil.json at seed time.
+  const variationCodes = Object.keys(variations);
+  const variationRows = variationCodes.reduce((n, c) => n + variations[c].length, 0);
+  const variationsPayload = {
+    meta: { source: "bilgewater-market" as const, asOf: asOf() },
+    variations,
+  };
+  await writeFile(VARIATIONS_OUT, JSON.stringify(variationsPayload), "utf8");
+
   const codes = Object.keys(prices);
   console.log(`\n[fetch-prices] source: ${payload.meta.source}`);
   console.log(`[fetch-prices] asOf: ${payload.meta.asOf}`);
   console.log(`[fetch-prices] priced cardCodes: ${codes.length}`);
   console.log(`[fetch-prices] foil cardCodes: ${foilPayload.codes.length}`);
+  console.log(
+    `[fetch-prices] variation codes: ${variationCodes.length} / rows: ${variationRows}`
+  );
   console.log(
     `[fetch-prices] foil samples: ${JSON.stringify(foilPayload.codes.slice(0, 8))}`
   );
@@ -362,6 +424,11 @@ async function main(): Promise<void> {
   }
   if (codes.length === 0) {
     console.warn("[fetch-prices] WARNING: no prices obtained; wrote empty map");
+  }
+  if (variationRows === 0) {
+    console.warn(
+      "[fetch-prices] WARNING: no variation rows obtained; wrote empty variations map"
+    );
   }
 }
 

@@ -1,23 +1,33 @@
-"use client";
-
-import { useCallback, useRef, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { BuyTab } from "@/components/buy-tab";
-import { SellPanel } from "@/components/sell-panel";
-import { WtbBoard } from "@/components/wtb-board";
-import { tabSwap } from "@/lib/motion";
+import { HomeTabs, type CatalogFacets, type WantPost } from "@/components/home-tabs";
+import { CARDS } from "@/data/cards";
+import { RARITY_CLASSES } from "@/lib/rarity";
+import { getListings, getWtbPosts } from "@/lib/marketplace";
+import { getCurrentUser } from "@/lib/users";
 
-export default function Home() {
-  const [tab, setTab] = useState("buy");
-  const panelRef = useRef<HTMLDivElement>(null);
+export const dynamic = "force-dynamic";
 
-  const handleTabChange = useCallback((value: string) => {
-    setTab(value);
-    requestAnimationFrame(() => {
-      if (panelRef.current) tabSwap(panelRef.current);
-    });
-  }, []);
+export default async function Home() {
+  const [sale, wants, user] = await Promise.all([
+    getListings("sale"),
+    getWtbPosts(),
+    getCurrentUser(),
+  ]);
+
+  // getWtbPosts already resolves each want's best in-budget listing server-side.
+  const posts: WantPost[] = wants.map((p) => ({ ...p, match: p.match ?? null }));
+
+  // Facet options for the card picker, computed on the server so the client
+  // bundle never needs the full cards catalogue.
+  const catalog: CatalogFacets = {
+    total: CARDS.length,
+    sets: Array.from(new Set(CARDS.map((c) => c.cardSet))).sort(),
+    rarities: Object.keys(RARITY_CLASSES),
+    domains: Array.from(
+      new Set(CARDS.map((c) => c.domain).filter((d) => d.length > 0)),
+    ).sort(),
+    types: Array.from(new Set(CARDS.map((c) => c.cardType))).sort(),
+  };
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
@@ -31,31 +41,7 @@ export default function Home() {
         </p>
       </header>
 
-      <Tabs value={tab} onValueChange={handleTabChange} className="gap-3">
-        <TabsList className="h-11 w-full sm:h-12">
-          <TabsTrigger value="buy" className="flex-1 text-sm sm:text-[15px]">
-            Buy
-          </TabsTrigger>
-          <TabsTrigger value="sell" className="flex-1 text-sm sm:text-[15px]">
-            Sell
-          </TabsTrigger>
-          <TabsTrigger value="looking" className="flex-1 text-sm sm:text-[15px]">
-            Looking for
-          </TabsTrigger>
-        </TabsList>
-
-        <div ref={panelRef}>
-          <TabsContent value="buy">
-            <BuyTab />
-          </TabsContent>
-          <TabsContent value="sell">
-            <SellPanel />
-          </TabsContent>
-          <TabsContent value="looking">
-            <WtbBoard />
-          </TabsContent>
-        </div>
-      </Tabs>
+      <HomeTabs sale={sale} wants={posts} user={user} catalog={catalog} />
 
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <Badge variant="outline" className="border-zinc-700 text-zinc-400">
@@ -63,7 +49,7 @@ export default function Home() {
         </Badge>
         <span>
           Sellers, stock and asking prices are fictional. Your own listings and wants
-          stay in your browser.
+          are stored in your local database.
         </span>
       </p>
     </div>

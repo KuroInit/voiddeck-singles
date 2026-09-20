@@ -1,22 +1,13 @@
-"use client";
-
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { toast } from "sonner";
-import { AskPanel } from "@/components/ask-panel";
-import { CardFrame } from "@/components/card-frame";
-import { FoilArt } from "@/components/foil-art";
+import { DetailArt, ListingActions } from "@/components/listing-detail-client";
+import { VariationPriceList } from "@/components/variation-price-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { findCard } from "@/data/cards";
-import type { Listing } from "@/data/listings";
-import { addToCart, getAllListings } from "@/lib/marketplace";
-import { isFoil } from "@/lib/foil";
-import { bump, pressable } from "@/lib/motion";
+import { getListingById } from "@/lib/marketplace";
 import {
   conditionLabel,
   languageLabel,
@@ -25,13 +16,8 @@ import {
   rarityClass,
   typeLabel,
 } from "@/lib/rarity";
-import { getPriceFor } from "@/lib/prices";
-import { cn } from "@/lib/utils";
 
-const SOURCE_LABELS: Record<string, string> = {
-  "bilgewater-market": "Bilgewater Market",
-  "tcgplayer-mirror": "TCGplayer mirror",
-};
+export const dynamic = "force-dynamic";
 
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -42,66 +28,20 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function DetailArt({ listing }: { listing: Listing }) {
-  const card = findCard(listing.cardCode);
-  const [failed, setFailed] = useState(false);
-  return (
-    <FoilArt
-      cardCode={listing.cardCode}
-      className="w-full max-w-xs shrink-0 rounded-xl lg:max-w-sm"
-    >
-      {card?.imageUrl && !failed ? (
-        <img
-          src={card.imageUrl}
-          alt={listing.cardName}
-          loading="lazy"
-          className="aspect-[744/1039] w-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <CardFrame
-          name={listing.cardName}
-          rarity={listing.rarity}
-          className="aspect-[744/1039] w-full"
-        />
-      )}
-    </FoilArt>
-  );
-}
-
-export default function ListingPage() {
-  const params = useParams<{ id: string }>();
-  const id = typeof params?.id === "string" ? params.id : undefined;
-  const [listing, setListing] = useState<Listing | null | undefined>(undefined);
-  const [askOpen, setAskOpen] = useState(false);
-  const cartBtnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    const found = getAllListings().find((l) => l.id === id) ?? null;
-    setListing(found);
-  }, [id]);
-
-  useEffect(() => {
-    if (cartBtnRef.current) pressable(cartBtnRef.current);
-  }, [listing]);
-
-  if (listing === undefined) {
-    return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-8">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="aspect-[744/1039] w-full max-w-xs rounded-xl" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    );
-  }
+export default async function ListingPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const listing = await getListingById(id);
 
   if (listing === null) {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col items-start gap-3 px-4 py-16">
         <p className="text-lg font-medium text-zinc-200">Listing not found</p>
         <p className="text-sm text-zinc-500">
-          It may have been sold, or it belongs to this browser only.
+          It may have been sold, cancelled, or removed.
         </p>
         <Button asChild variant="outline" size="sm">
           <Link href="/">Back to the market</Link>
@@ -111,15 +51,7 @@ export default function ListingPage() {
   }
 
   const card = findCard(listing.cardCode);
-  const price = getPriceFor(listing.cardCode);
   const isWtb = listing.mode === "wtb";
-
-  function handleAdd() {
-    addToCart(listing!.id);
-    if (cartBtnRef.current) bump(cartBtnRef.current);
-    window.dispatchEvent(new CustomEvent("vds:cart-changed"));
-    toast.success("Added to cart");
-  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
@@ -216,29 +148,11 @@ export default function ListingPage() {
             </div>
           ) : null}
 
-          {price ? (
-            <p className="text-xs text-zinc-500">
-              Reference: US${price.usd.toFixed(2)} ≈ S${(price.usd * 1.35).toFixed(2)} —{" "}
-              {SOURCE_LABELS[price.source] ?? price.source}, {price.asOf}
-            </p>
-          ) : (
-            <p className="text-xs text-zinc-500">No reference price available.</p>
-          )}
+          <VariationPriceList cardCode={listing.cardCode} />
 
-          <div className="flex flex-wrap gap-2">
-            {!isWtb ? (
-              <Button ref={cartBtnRef} onClick={handleAdd}>
-                Add to cart
-              </Button>
-            ) : null}
-            <Button variant="outline" onClick={() => setAskOpen(true)}>
-              Ask about this listing
-            </Button>
-          </div>
+          <ListingActions listing={listing} />
         </div>
       </div>
-
-      <AskPanel open={askOpen} onOpenChange={setAskOpen} listingId={listing.id} />
     </div>
   );
 }

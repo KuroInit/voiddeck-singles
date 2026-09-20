@@ -10,7 +10,7 @@ import { FacetBar } from "@/components/facet-bar";
 import { ListingCard } from "@/components/listing-card";
 import { SearchBar } from "@/components/search-bar";
 import type { Listing } from "@/data/listings";
-import { addToCart, getListings } from "@/lib/marketplace";
+import { addToCart } from "@/lib/cart";
 import { revealStagger } from "@/lib/motion";
 import { toast } from "sonner";
 
@@ -18,12 +18,13 @@ function notifyCartChanged() {
   window.dispatchEvent(new CustomEvent("vds:cart-changed"));
 }
 
-export function BuyTab() {
-  // Read localStorage-backed listings only after mount: during SSR (and the
-  // hydration pass) only seeds exist, so a render-time read would mismatch.
-  const [catalogue, setCatalogue] = useState<Listing[]>([]);
-  const [base, setBase] = useState<Listing[] | null>(null); // null = full catalogue
-  const [shown, setShown] = useState<Listing[]>([]);
+export function BuyTab({ listings }: { listings: Listing[] }) {
+  // Sale listings arrive from the server page; sort once, price ascending.
+  const [catalogue] = useState<Listing[]>(() =>
+    [...listings].sort((a, b) => a.priceSgd - b.priceSgd),
+  );
+  const [base, setBase] = useState<Listing[] | null>(null);
+  const [shown, setShown] = useState<Listing[]>(catalogue);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [askOpen, setAskOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
@@ -31,12 +32,6 @@ export function BuyTab() {
   const [prefillGoal, setPrefillGoal] = useState<string | undefined>(undefined);
   const [prefillBudget, setPrefillBudget] = useState<number | undefined>(undefined);
   const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const seed = getListings("sale").slice().sort((a, b) => a.priceSgd - b.priceSgd);
-    setCatalogue(seed);
-    setShown(seed);
-  }, []);
 
   const onFacets = useCallback((next: Listing[]) => setShown(next), []);
 
@@ -46,7 +41,7 @@ export function BuyTab() {
       setReasons(reasons);
       if (listings === null) setShown(catalogue);
     },
-    [catalogue]
+    [catalogue],
   );
 
   useEffect(() => {
@@ -54,7 +49,7 @@ export function BuyTab() {
   }, [shown]);
 
   function handleAdd(listing: Listing) {
-    addToCart(listing.id);
+    addToCart(listing.id, 1, { maxQty: listing.qty });
     notifyCartChanged();
     toast.success("Added to cart");
   }
@@ -63,7 +58,7 @@ export function BuyTab() {
 
   return (
     <div className="flex w-full flex-col gap-4 pb-24 md:gap-5">
-      <SearchBar onResults={onSearchResults} />
+      <SearchBar listings={catalogue} onResults={onSearchResults} />
 
       <FacetBar listings={base ?? catalogue} onChange={onFacets} />
 
@@ -121,6 +116,7 @@ export function BuyTab() {
       <BundleSheet
         open={bundleOpen}
         onOpenChange={setBundleOpen}
+        listings={catalogue}
         prefillGoal={prefillGoal}
         prefillBudget={prefillBudget}
       />

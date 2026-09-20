@@ -20,13 +20,36 @@ multiple singles to build decks.
 | **Search** | A plain, deterministic search over the listings — token scoring plus local price parsing ("removal under $1"). Not AI-powered; works with the gateway disabled. |
 | **Shop Q&A** | Catalogue-grounded assistant that cites listing ids (`[L07]`) and says plainly what the listings do *not* establish (authenticity, market value, print run). |
 | **Deck-core builder** | "build me a Noxus aggro core under $30" → a composed cart from available singles, repriced server-side, with honest gaps. |
-| **Deck import** | Paste a `riftdecks.com` deck link → the decklist is parsed, every card mapped to the card DB, and stock availability shown per line ("buy what's in stock"). |
+| **Deck import** | Paste a `riftdecks.com` deck link → the decklist is parsed, every card mapped to the card DB, and stock availability shown per line ("buy what's in stock"). Out-of-stock lines become assistant-proposed Looking-for posts — editable, and created only after you confirm. |
 
 ## Stack
 
 Next.js 15 (App Router) · TypeScript · Tailwind v4 · shadcn/ui (**radix-nova**) · `motion`
 (vanilla JS core API, no React bindings) · plain `fetch` to an OpenAI-compatible chat
-endpoint (no SDK).
+endpoint (no SDK) · **embedded SQLite** via `node:sqlite` (Node 24's built-in
+`DatabaseSync` — no native addon, no external service).
+
+## Data layer
+
+All persistent state lives in a local database file, `data/vds.db` (gitignored), across
+four stores: **cards** (every Riftbound printing + per-variation Bilgewater prices),
+**listings** (a SQL view over open sell posts), **users** (seeded fictional sellers +
+handle-only local demo accounts), and **posts** (sell posts create listings; want posts
+feed the Looking-for board). Reads happen in server components through
+`src/lib/marketplace.ts` (server-only); client mutations POST to the API routes and call
+`router.refresh()`. Re/seed with:
+
+```bash
+npm run db:seed
+```
+
+The database also bootstraps itself lazily on first request (`ensureSeeded()`), so a
+fresh clone works without the explicit step. The one piece of state that stays in the
+browser is the **cart** (`vds_cart` in `localStorage`), validated against the live
+listings whenever the cart sheet opens.
+
+Deck import proposes Looking-for posts for cards that are out of stock — the proposals
+are shown as an explicit validation step and **nothing is created until you confirm**.
 
 ## Run it locally
 
@@ -88,10 +111,12 @@ no-ops under `prefers-reduced-motion`.
 
 ## Scope / known limitations
 
-- Local-only by request: no hosting, no CI, no accounts. User-created listings and wants
-  live in `localStorage` (`vds_user_listings`, `vds_user_wtb`, `vds_cart`) and are labelled
-  "demo — stored in your browser".
-- No real payments (the checkout modal says so), no auth, no live price refresh in the
-  running app, no embeddings.
+- Local-only by request: no hosting, no CI, no real auth. User-created listings, wants
+  and posts live in the local database (`data/vds.db`) and are labelled "demo — stored
+  in your local database"; sign-in is a one-click local demo handle (no passwords). The
+  cart alone stays in `localStorage` (`vds_cart`) and is labelled "stored in your
+  browser".
+- No real payments (the checkout modal says so), no access control, no live price
+  refresh in the running app, no embeddings.
 - Seeded listings cover an **Origins (OGN)** subset only; the card database behind the
   pickers and deck import spans all sets.

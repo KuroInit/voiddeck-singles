@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { findCard } from "@/data/cards";
 import { FoilArt } from "@/components/foil-art";
-import { addWtbPost, addToCart } from "@/lib/marketplace";
+import { addToCart } from "@/lib/cart";
 import { revealStagger, bump } from "@/lib/motion";
 import {
   Sheet,
@@ -33,13 +34,30 @@ type DeckLine = {
   inDb: boolean;
   bestListing: { id: string; priceSgd: number } | null;
 };
-type DeckResult = { name: string; lines: DeckLine[] };
+
+type DeckProposal = {
+  cardCode: string;
+  cardName: string;
+  qty: number;
+  budgetSgd: number;
+  note: string;
+  inDb: boolean;
+};
+
+type DeckResult = { name: string; lines: DeckLine[]; proposals?: DeckProposal[] };
+
+type ProposalRow = DeckProposal & {
+  checked: boolean;
+  budget: string;
+  noteDraft: string;
+};
 
 export function DeckImportSheet({
   open,
   onOpenChange,
   onPrefillBundle,
 }: DeckImportSheetProps) {
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [pasted, setPasted] = useState("");
   const [pasteMode, setPasteMode] = useState(false);
@@ -49,6 +67,13 @@ export function DeckImportSheet({
   const [wantFor, setWantFor] = useState<number | null>(null); // deck line index with the inline want form open
   const [wantBudget, setWantBudget] = useState("");
   const [wantNote, setWantNote] = useState("");
+  const [proposals, setProposals] = useState<ProposalRow[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createdCount, setCreatedCount] = useState<number | null>(null);
+  const [needSignup, setNeedSignup] = useState(false);
+  const [signupHandle, setSignupHandle] = useState("");
+  const [signingUp, setSigningUp] = useState(false);
+  const pendingRowsRef = useRef<ProposalRow[] | null>(null);
   const linesRef = useRef<HTMLDivElement | null>(null);
   const cartBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -63,6 +88,13 @@ export function DeckImportSheet({
       setWantFor(null);
       setWantBudget("");
       setWantNote("");
+      setProposals([]);
+      setCreating(false);
+      setCreatedCount(null);
+      setNeedSignup(false);
+      setSignupHandle("");
+      setSigningUp(false);
+      pendingRowsRef.current = null;
     }
   }, [open]);
 
@@ -101,6 +133,14 @@ export function DeckImportSheet({
       }
       const data = (await res.json()) as DeckResult;
       setDeck(data);
+      setProposals(
+        (data.proposals ?? []).map((p) => ({
+          ...p,
+          checked: true,
+          budget: p.budgetSgd.toFixed(2),
+          noteDraft: p.note,
+        }))
+      );
     } catch {
       setError("Import failed — try again");
     } finally {
@@ -113,6 +153,7 @@ export function DeckImportSheet({
     (sum, l) => sum + l.qty * (l.bestListing?.priceSgd ?? 0),
     0
   );
+  const checkedCount = proposals.filter((p) => p.checked).length;
 
   const addAllAvailable = () => {
     for (const line of stocked) {
@@ -128,19 +169,133 @@ export function DeckImportSheet({
     onOpenChange(false);
   };
 
-  const postWant = (line: DeckLine) => {
+  const fallbackNote = `Auto-proposed from deck import: ${deck?.name ?? "deck"}`;
+
+  /**
+   * Creates one want post per checked proposal row. On 401 NO_USER the pending
+   * rows are parked and the inline signup shows; after signup the same rows
+   * are retried — nothing is silently dropped.
+   */
+  const createWants = async (rows: ProposalRow[]): Promise<boolean> => {
+    setCreating(true);
+    try {
+      let made = 0;
+      for (const row of rows) {
+        const budgetNum = Number(row.budget);
+        try {
+          const res = await fetch("/api/posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              kind: "want",
+              cardCode: row.cardCode,
+              cardName: row.cardName,
+              qty: row.qty,
+              budgetSgd: Number.isFinite(budgetNum) && budgetNum > 0 ? budgetNum : 0,
+              note: row.noteDraft.trim() || fallbackNote,
+              source: "ai_proposed",
+            }),
+          });
+          if (res.status === 401) {
+            pendingRowsRef.current = rows.slice(made);
+            setNeedSignup(true);
+            return false;
+          }
+          if (!res.ok) {
+            toast.error(
+              made > 0
+                ? `${made} want posts created, but ${row.cardName} failed — the rest were skipped`
+                : `Could not create the want post for ${row.cardName} — try again`
+            );
+            return false;
+          }
+          made++;
+        } catch {
+          toast.error(
+            made > 0
+              ? `${made} want posts created, but the rest failed — network error`
+              : "Could not create want posts — network error, try again"
+          );
+          return false;
+        }
+      }
+      setCreatedCount(made);
+      setProposals((prev) => prev.map((p) => ({ ...p, checked: false })));
+      toast.success(`${made} want posts created — see the Looking for tab`);
+      router.refresh();
+      return true;
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const signUpAndRetry = async () => {
+    const handle = signupHandle.trim();
+    if (handle.length === 0 || signingUp) return;
+    setSigningUp(true);
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: unknown };
+        toast.error(
+          typeof data.error === "string" && data.error !== "NO_USER"
+            ? data.error
+            : "Could not create that account — try another handle"
+        );
+        return;
+      }
+      setNeedSignup(false);
+      setSignupHandle("");
+      const rows = pendingRowsRef.current;
+      pendingRowsRef.current = null;
+      if (rows && rows.length > 0) {
+        await createWants(rows);
+      } else {
+        toast.success(`Demo account created — you're signed in as ${handle}`);
+      }
+    } catch {
+      toast.error("Could not create that account — try again");
+    } finally {
+      setSigningUp(false);
+    }
+  };
+
+  const postWant = async (line: DeckLine) => {
     const budgetNum = Number(wantBudget);
-    addWtbPost({
-      cardName: line.name,
-      cardCode: line.inDb ? line.cardCode : null,
-      qty: line.qty,
-      budgetSgd: Number.isFinite(budgetNum) && budgetNum > 0 ? budgetNum : 0,
-      note: wantNote || "from imported deck",
-    });
-    toast.success("Want posted — visible in your browser");
-    setWantFor(null);
-    setWantBudget("");
-    setWantNote("");
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "want",
+          cardCode: line.inDb ? line.cardCode : null,
+          cardName: line.name,
+          qty: line.qty,
+          budgetSgd: Number.isFinite(budgetNum) && budgetNum > 0 ? budgetNum : 0,
+          note: wantNote || "from imported deck",
+          source: "user",
+        }),
+      });
+      if (res.status === 401) {
+        pendingRowsRef.current = null;
+        setNeedSignup(true);
+        return;
+      }
+      if (!res.ok) {
+        toast.error("Could not post the want — try again");
+        return;
+      }
+      toast.success("Want posted — see the Looking for tab");
+      setWantFor(null);
+      setWantBudget("");
+      setWantNote("");
+    } catch {
+      toast.error("Could not post the want — try again");
+    }
   };
 
   return (
@@ -278,12 +433,136 @@ export function DeckImportSheet({
                 })}
               </div>
 
+              {proposals.length > 0 ? (
+                <div
+                  data-anim="item"
+                  className="space-y-2 rounded-xl border border-amber-700/40 p-3"
+                >
+                  <p className="text-sm font-medium">
+                    The assistant proposed these Looking-for posts — nothing is created
+                    until you confirm.
+                  </p>
+                  {proposals.map((row) => (
+                    <div
+                      key={row.cardCode}
+                      className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border px-3 py-2"
+                    >
+                      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-amber-500"
+                          checked={row.checked}
+                          disabled={createdCount !== null || creating}
+                          onChange={(e) =>
+                            setProposals((prev) =>
+                              prev.map((p) =>
+                                p.cardCode === row.cardCode
+                                  ? { ...p, checked: e.target.checked }
+                                  : p
+                              )
+                            )
+                          }
+                        />
+                        <span className="truncate">
+                          {row.qty}× {row.cardName}
+                        </span>
+                      </label>
+                      <Label
+                        htmlFor={`prop-budget-${row.cardCode}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Budget S$
+                      </Label>
+                      <Input
+                        id={`prop-budget-${row.cardCode}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        className="h-8 w-24"
+                        value={row.budget}
+                        disabled={createdCount !== null || creating}
+                        onChange={(e) =>
+                          setProposals((prev) =>
+                            prev.map((p) =>
+                              p.cardCode === row.cardCode
+                                ? { ...p, budget: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                      <Input
+                        className="h-8 w-full sm:w-auto sm:min-w-[14rem] sm:flex-1"
+                        maxLength={90}
+                        placeholder="want note"
+                        value={row.noteDraft}
+                        disabled={createdCount !== null || creating}
+                        onChange={(e) =>
+                          setProposals((prev) =>
+                            prev.map((p) =>
+                              p.cardCode === row.cardCode
+                                ? { ...p, noteDraft: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                  {createdCount !== null ? (
+                    <p className="text-xs text-emerald-400">
+                      {createdCount} want posts created — see the Looking for tab on the
+                      home board.
+                    </p>
+                  ) : (
+                    <Button
+                      onClick={() => void createWants(proposals.filter((p) => p.checked))}
+                      disabled={creating || checkedCount === 0}
+                      className="w-full"
+                    >
+                      Create {checkedCount} want posts
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+
+              {needSignup ? (
+                <form
+                  data-anim="item"
+                  className="space-y-2 rounded-xl border border-border bg-zinc-900/40 p-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void signUpAndRetry();
+                  }}
+                >
+                  <p className="text-xs text-muted-foreground">
+                    local demo account — one click, no password
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Handle"
+                      placeholder="pick a handle, e.g. mrtan"
+                      maxLength={32}
+                      value={signupHandle}
+                      onChange={(e) => setSignupHandle(e.target.value)}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={signingUp || signupHandle.trim().length === 0}
+                    >
+                      {signingUp ? "Creating…" : "Create account & retry"}
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
               {wantFor !== null && deck.lines[wantFor] ? (
                 <form
                   className="space-y-2 rounded-xl border border-amber-700/40 p-3"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    postWant(deck.lines[wantFor]);
+                    void postWant(deck.lines[wantFor]);
                   }}
                 >
                   <div className="text-xs text-amber-400">

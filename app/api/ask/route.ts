@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
   const listingId = typeof body.listingId === "string" ? body.listingId : undefined;
 
-  const catalogue = getAllListings().filter((l) => l.mode === "sale");
+  const catalogue = (await getAllListings()).filter((l) => l.mode === "sale");
 
   // Deterministic retrieval: score the catalogue against the query tokens.
   const retrieval = scoreCatalogue(catalogue, fallbackIntent(q)).slice(0, 12);

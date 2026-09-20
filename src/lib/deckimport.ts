@@ -5,6 +5,7 @@
  */
 import { CARDS, findCard, type Card } from "@/data/cards";
 import { bestListingFor } from "@/lib/marketplace";
+import { USD_SGD, getPriceFor } from "@/lib/prices";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -65,12 +66,13 @@ function slugify(name: string): string {
 
 type RawEntry = { name: string; qty: number; cardCode?: string };
 
-function toLine(e: RawEntry): ImportedLine {
+async function toLine(e: RawEntry): Promise<ImportedLine> {
   const card = e.cardCode
     ? findCard(e.cardCode.toLowerCase())
     : (NAME_INDEX.get(e.name.toLowerCase()) ?? null);
   const cardCode = e.cardCode?.toLowerCase() ?? (card ? card.cardCode : slugify(e.name));
-  const best = card ? bestListingFor(cardCode) : null;
+  // bestListingFor is async under the db-backed marketplace.
+  const best = card ? await bestListingFor(cardCode) : null;
   return {
     cardCode,
     name: e.name,
@@ -168,14 +170,17 @@ export async function fetchDeck(url: string): Promise<ImportedDeck> {
     throw new DeckImportError("DECK_FETCH_FAILED", "No card rows parsed from deck page");
   }
 
-  return { name: deckName(html, url), lines: entries.map(toLine) };
+  return {
+    name: deckName(html, url),
+    lines: await Promise.all(entries.map(toLine)),
+  };
 }
 
 /**
  * Fallback parser for pasted decklist text. One card per line:
  * `4 Name`, `4x Name`, `Name x4`, or bare `Name` (qty 1).
  */
-export function parseDeckText(text: string): ImportedDeck {
+export async function parseDeckText(text: string): Promise<ImportedDeck> {
   const entries: RawEntry[] = [];
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -193,5 +198,58 @@ export function parseDeckText(text: string): ImportedDeck {
     entries.push({ name: line, qty: 1 });
   }
 
-  return { name: "Imported decklist", lines: entries.map(toLine) };
+  return {
+    name: "Imported decklist",
+    lines: await Promise.all(entries.map(toLine)),
+  };
+}
+
+export type DeckProposal = {
+  cardCode: string;
+  cardName: string;
+  qty: number;
+  budgetSgd: number;
+  note: string;
+  inDb: boolean;
+};
+
+const MAX_PROPOSED_QTY = 4;
+
+/**
+ * Deterministic want-post proposals for deck lines with no stock.
+ *
+ * Pure and unit-testable: no AI, no I/O. Only in-catalogue lines are proposed
+ * (not-in-catalogue lines stay reported in `lines` as today); lines are grouped
+ * by cardCode with qty summed (capped at MAX_PROPOSED_QTY) and the first name
+ * kept. budgetSgd is the reference price (usd x 1.35) x qty, or a 1.00/card
+ * placeholder when the card is unpriced so the field stays editable. The note
+ * is a deterministic template — the route enriches it via the AI gateway.
+ */
+export function buildProposals(
+  lines: ImportedLine[],
+  deckName: string
+): DeckProposal[] {
+  const byCode = new Map<string, { cardName: string; qty: number }>();
+  for (const line of lines) {
+    if (line.bestListing !== null || !line.inDb) continue;
+    const existing = byCode.get(line.cardCode);
+    if (existing) existing.qty += line.qty;
+    else byCode.set(line.cardCode, { cardName: line.name, qty: line.qty });
+  }
+
+  const proposals: DeckProposal[] = [];
+  for (const [cardCode, { cardName, qty }] of byCode) {
+    const cappedQty = Math.min(qty, MAX_PROPOSED_QTY);
+    const usd = getPriceFor(cardCode)?.usd ?? 0;
+    const perCard = usd > 0 ? usd * USD_SGD : 1;
+    proposals.push({
+      cardCode,
+      cardName,
+      qty: cappedQty,
+      budgetSgd: Math.round(perCard * cappedQty * 100) / 100,
+      note: `Auto-proposed from deck import: ${deckName}`,
+      inDb: true,
+    });
+  }
+  return proposals;
 }

@@ -27,9 +27,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "MISSING_INPUT" }, { status: 400 });
   }
 
-  const candidates = scoreCatalogue(getListings("sale"), fallbackIntent(goal)).slice(0, 30);
+  const allSale = await getListings("sale");
+  const candidates = scoreCatalogue(allSale, fallbackIntent(goal)).slice(0, 30);
   const byId = new Map(
-    (getListings("sale") as Listing[]).map((l) => [l.id, l])
+    allSale.map((l) => [l.id, l])
   );
   const candidateList = candidates
     .map((c) => byId.get(c.id))

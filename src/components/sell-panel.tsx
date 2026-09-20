@@ -1,17 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Card } from "@/data/cards";
 import type { Listing } from "@/data/listings";
-import {
-  addListing,
-  getListings,
-  isUserListing,
-} from "@/lib/marketplace";
-import { USD_SGD, getPriceFor } from "@/lib/prices";
-import { LISTING_TYPES, pickupLabel } from "@/lib/rarity";
-import { revealStagger } from "@/lib/motion";
+import type { CatalogFacets, VdsUser } from "@/components/home-tabs";
 import { CardPicker } from "@/components/card-picker";
+import { VariationPriceList } from "@/components/variation-price-list";
 import { FoilArt } from "@/components/foil-art";
 import { CardFrame } from "@/components/card-frame";
 import { Badge } from "@/components/ui/badge";
@@ -26,26 +21,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LISTING_TYPES, pickupLabel } from "@/lib/rarity";
 import { toast } from "sonner";
-
-const SOURCE_LABELS: Record<string, string> = {
-  "bilgewater-market": "Bilgewater Market",
-  "tcgplayer-mirror": "TCGplayer mirror",
-};
 
 const CONDITIONS = ["nm", "lp", "mp", "psa9"] as const;
 const PICKUPS = ["games-haven-pl", "hobbystation", "jurong-east-mrt", "mail"] as const;
 
-function referenceLine(cardCode: string): string | null {
-  const p = getPriceFor(cardCode);
-  if (!p) return null;
-  const sgd = Math.round(p.usd * USD_SGD * 100) / 100;
-  return `Reference: US$${p.usd.toFixed(2)} ≈ S$${sgd.toFixed(2)} — ${
-    SOURCE_LABELS[p.source] ?? p.source
-  }, ${p.asOf}`;
-}
+type SellPayload = {
+  kind: "sell";
+  cardCode: string;
+  cardName: string;
+  printing: Listing["printing"];
+  rarity: string;
+  type: Listing["type"];
+  condition: Listing["condition"];
+  language: Listing["language"];
+  qty: number;
+  priceSgd: number;
+  grade: string | null;
+  pickup: Listing["pickup"];
+  note: string;
+};
 
-export function SellPanel() {
+export function SellPanel({
+  listings,
+  user,
+  catalog,
+}: {
+  listings: Listing[];
+  user: VdsUser | null;
+  catalog: CatalogFacets;
+}) {
+  const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
   const [printing, setPrinting] = useState<Listing["printing"]>("standard");
@@ -55,34 +62,41 @@ export function SellPanel() {
   const [pickup, setPickup] = useState<Listing["pickup"]>("games-haven-pl");
   const [note, setNote] = useState("");
   const [price, setPrice] = useState("");
-  const [mine, setMine] = useState<Listing[]>([]);
+  const [pendingPost, setPendingPost] = useState<SellPayload | null>(null);
+  const [handle, setHandle] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Load only in the browser to avoid SSR/hydration drift.
-  useEffect(() => {
-    setMine(getListings("sale").filter(isUserListing));
-  }, []);
-
-  useEffect(() => {
-    if (mine.length > 0 && listRef.current) revealStagger(listRef.current);
-  }, [mine]);
+  // Your active listings = posts where the seller is you (source "user"),
+  // derived from the listings prop after each server refresh.
+  const mine = useMemo(
+    () => listings.filter((l) => l.source === "user"),
+    [listings],
+  );
 
   const pickCard = (c: Card) => {
     setCard(c);
-    const ref = getPriceFor(c.cardCode);
-    if (ref) setPrice(ref.usd.toFixed(2));
+    setPrice("");
   };
+
+  // Prefill the asking price from the card's reference price (normal
+  // variation, else cheapest priced variation). Never invented — only fires
+  // when a priced variation exists.
+  const handlePrices = useCallback((minUsd: number | null) => {
+    if (minUsd !== null) setPrice(minUsd.toFixed(2));
+  }, []);
 
   const priceNum = Number(price);
   const canPost = card !== null && Number.isFinite(priceNum) && priceNum > 0;
 
   const noteWords = note.trim() ? note.trim().split(/\s+/).length : 0;
 
-  const submit = () => {
+  const submit = async () => {
     if (!card || !canPost) return;
-    addListing({
-      cardName: card.fullName,
+    const payload: SellPayload = {
+      kind: "sell",
       cardCode: card.cardCode,
+      cardName: card.fullName,
       printing,
       rarity: (card.rarity as Listing["rarity"]) ?? "common",
       type: (LISTING_TYPES.find((t) => t === card.cardType) ?? "unit") as Listing["type"],
@@ -93,15 +107,63 @@ export function SellPanel() {
       grade: condition === "psa9" ? "PSA 9" : null,
       pickup,
       note,
+    };
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
-    toast.success("Listing posted — visible in your browser");
-    setMine(getListings("sale").filter(isUserListing));
+    if (res.status === 401) {
+      // No current user — prompt the inline mini-signup, then retry.
+      setPendingPost(payload);
+      return;
+    }
+    if (!res.ok) {
+      toast.error("Could not post the listing — try again");
+      return;
+    }
+    toast.success("Listing posted — visible in the market");
     setCard(null);
     setPrice("");
     setNote("");
+    setPendingPost(null);
+    router.refresh();
   };
 
-  const refLine = card ? referenceLine(card.cardCode) : null;
+  const signUp = async (retry: SellPayload | null) => {
+    const trimmed = handle.trim();
+    if (!trimmed || signingIn) return;
+    setSigningIn(true);
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: trimmed }),
+      });
+      if (!res.ok) {
+        toast.error("Could not create that handle — try another");
+        return;
+      }
+      toast.success(`Signed in as @${trimmed}`);
+      setHandle("");
+      setPendingPost(null);
+      router.refresh();
+      if (retry) {
+        await fetch("/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(retry),
+        });
+        toast.success("Listing posted — visible in the market");
+        setCard(null);
+        setPrice("");
+        setNote("");
+        router.refresh();
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -114,14 +176,14 @@ export function SellPanel() {
         {card ? `Card: ${card.fullName}` : "Pick a card"}
       </Button>
 
-      <CardPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={pickCard} />
+      <CardPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={pickCard} facets={catalog} />
 
       {card ? (
         <form
           className="space-y-4 rounded-xl border border-border p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <div className="flex gap-3">
@@ -231,12 +293,8 @@ export function SellPanel() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="sell-price">
-              Your asking price (S$){" "}
-              <span className="font-normal text-muted-foreground">
-                {refLine ?? "no reference price available"}
-              </span>
-            </Label>
+            <Label htmlFor="sell-price">Your asking price (S$)</Label>
+            <VariationPriceList cardCode={card.cardCode} onPrices={handlePrices} />
             <Input
               id="sell-price"
               type="number"
@@ -275,10 +333,34 @@ export function SellPanel() {
         </form>
       ) : null}
 
+      {pendingPost && user === null ? (
+        <div className="space-y-2 rounded-xl border border-amber-700/50 p-4">
+          <p className="text-sm text-amber-400">
+            Post as a local demo account — one click, no password.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="pick a handle, e.g. voiddeck_reg"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              aria-label="Handle for your local demo account"
+            />
+            <Button
+              type="button"
+              disabled={!handle.trim() || signingIn}
+              onClick={() => void signUp(pendingPost)}
+            >
+              Sign in
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div ref={listRef} className="space-y-2">
         <h3 className="text-sm font-medium">Your active listings</h3>
         <p className="text-xs text-muted-foreground">
-          demo — stored in your browser
+          demo — stored in your local database
+          {user !== null ? ` · posting as @${user.handle}` : ""}
         </p>
         {mine.length === 0 ? (
           <p className="text-sm text-muted-foreground">No listings yet.</p>

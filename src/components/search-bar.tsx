@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Listing } from "@/data/listings";
-import { getListings } from "@/lib/marketplace";
 import { fallbackIntent, scoreCatalogue } from "@/lib/search";
 
 const EXAMPLES = [
@@ -18,12 +17,15 @@ const EXAMPLES = [
 
 /**
  * Plain search over the for-sale listings: deterministic token scoring plus
- * local price parsing ("removal under $1"), computed in the browser — no AI,
- * no network call.
+ * local price parsing ("removal under $1"), computed in the browser — no AI.
+ * The catalogue comes from the server page as a prop (the listings now live
+ * in the local database); the scorer itself is unchanged.
  */
 export function SearchBar({
+  listings,
   onResults,
 }: {
+  listings: Listing[];
   onResults: (listings: Listing[] | null, reasons: Record<string, string>) => void;
 }) {
   const [q, setQ] = useState("");
@@ -35,8 +37,8 @@ export function SearchBar({
       clear();
       return;
     }
-    const scored = scoreCatalogue(getListings("sale"), fallbackIntent(trimmed));
-    const byId = new Map(getListings("sale").map((l) => [l.id, l]));
+    const scored = scoreCatalogue(listings, fallbackIntent(trimmed));
+    const byId = new Map(listings.map((l) => [l.id, l]));
     const reasons: Record<string, string> = {};
     const results: Listing[] = [];
     for (const s of scored.slice(0, 24)) {

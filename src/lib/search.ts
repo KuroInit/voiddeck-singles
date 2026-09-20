@@ -21,14 +21,6 @@ export type SearchIntent = {
 
 export type ScoredListing = { id: string; score: number; reason: string };
 
-const FACETS = {
-  printing: ["standard", "alt_art", "signature"],
-  rarity: ["common", "uncommon", "rare", "epic", "showcase"],
-  language: ["en", "zh"],
-  condition: ["nm", "lp", "mp", "psa9"],
-  type: ["legend", "unit", "spell", "rune", "battlefield", "gear", "token", "sealed", "bulk"],
-} as const;
-
 function tokens(text: string): string[] {
   return text
     .toLowerCase()

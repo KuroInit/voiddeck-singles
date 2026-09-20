@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CARDS, type Card } from "@/data/cards";
-import { rarityClass, RARITY_CLASSES } from "@/lib/rarity";
+import { useEffect, useRef, useState } from "react";
+import type { Card } from "@/data/cards";
+import { rarityClass } from "@/lib/rarity";
+import type { CatalogFacets } from "@/components/home-tabs";
 import {
   Dialog,
   DialogContent,
@@ -24,23 +25,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 type CardPickerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (card: Card) => void;
+  /** Facet options, computed on the server from the cards table. */
+  facets: CatalogFacets;
 };
 
-const RARITIES = Object.keys(RARITY_CLASSES);
 const MAX_RENDER = 200;
+const DEBOUNCE_MS = 200;
 
-export function CardPicker({ open, onOpenChange, onPick }: CardPickerProps) {
+/**
+ * Card picker over the full catalogue. Search queries the server
+ * (`GET /api/cards?q=&set=&rarity=&domain=&cardType=`, debounced 200ms,
+ * server cap 200) instead of importing cards.json client-side; facet options
+ * arrive as props from the server page.
+ */
+export function CardPicker({ open, onOpenChange, onPick, facets }: CardPickerProps) {
   const [q, setQ] = useState("");
   const [setFilter, setSetFilter] = useState("all");
   const [rarityFilter, setRarityFilter] = useState("all");
   const [domainFilter, setDomainFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [results, setResults] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(false);
+  const reqId = useRef(0);
 
   // Reset local state whenever the picker opens, so a stale query doesn't persist.
   useEffect(() => {
@@ -50,44 +63,37 @@ export function CardPicker({ open, onOpenChange, onPick }: CardPickerProps) {
       setRarityFilter("all");
       setDomainFilter("all");
       setTypeFilter("all");
+      setResults([]);
     }
   }, [open]);
 
-  const facets = useMemo(() => {
-    const sets = new Set<string>();
-    const domains = new Set<string>();
-    const types = new Set<string>();
-    for (const c of CARDS) {
-      sets.add(c.cardSet);
-      if (c.domain) domains.add(c.domain);
-      if (c.cardType) types.add(c.cardType);
-    }
-    return {
-      sets: Array.from(sets).sort(),
-      domains: Array.from(domains).sort(),
-      types: Array.from(types).sort(),
-    };
-  }, []);
-
-  const results = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const out = [];
-    for (const c of CARDS) {
-      if (setFilter !== "all" && c.cardSet !== setFilter) continue;
-      if (rarityFilter !== "all" && c.rarity !== rarityFilter) continue;
-      if (domainFilter !== "all" && c.domain !== domainFilter) continue;
-      if (typeFilter !== "all" && c.cardType !== typeFilter) continue;
-      if (
-        needle &&
-        !c.name.toLowerCase().includes(needle) &&
-        !c.fullName.toLowerCase().includes(needle)
-      ) {
-        continue;
+  // Debounced server-side search over the cards table.
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(async () => {
+      const params = new URLSearchParams();
+      const needle = q.trim();
+      if (needle) params.set("q", needle);
+      if (setFilter !== "all") params.set("set", setFilter);
+      if (rarityFilter !== "all") params.set("rarity", rarityFilter);
+      if (domainFilter !== "all") params.set("domain", domainFilter);
+      if (typeFilter !== "all") params.set("cardType", typeFilter);
+      const id = ++reqId.current;
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/cards?${params.toString()}`);
+        const data = (await res.json()) as { cards?: Card[] };
+        if (reqId.current === id) {
+          setResults(Array.isArray(data.cards) ? data.cards : []);
+        }
+      } catch {
+        if (reqId.current === id) setResults([]);
+      } finally {
+        if (reqId.current === id) setLoading(false);
       }
-      out.push(c);
-    }
-    return out;
-  }, [q, setFilter, rarityFilter, domainFilter, typeFilter]);
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [open, q, setFilter, rarityFilter, domainFilter, typeFilter]);
 
   const shown = results.slice(0, MAX_RENDER);
 
@@ -97,7 +103,7 @@ export function CardPicker({ open, onOpenChange, onPick }: CardPickerProps) {
         <DialogHeader className="shrink-0 p-0">
           <DialogTitle>Pick a card</DialogTitle>
           <DialogDescription>
-            Search the full Riftbound catalogue ({CARDS.length} cards).
+            Search the full Riftbound catalogue ({facets.total} cards).
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +134,7 @@ export function CardPicker({ open, onOpenChange, onPick }: CardPickerProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All rarities</SelectItem>
-                  {RARITIES.map((r) => (
+                  {facets.rarities.map((r) => (
                     <SelectItem key={r} value={r}>
                       {r[0].toUpperCase() + r.slice(1)}
                     </SelectItem>
@@ -165,7 +171,13 @@ export function CardPicker({ open, onOpenChange, onPick }: CardPickerProps) {
           </div>
 
           <CommandList className="min-h-0 max-h-none flex-1 overflow-y-auto">
-            {results.length === 0 ? (
+            {loading ? (
+              <div className="space-y-2 px-2 py-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : results.length === 0 ? (
               <CommandEmpty>No cards match those filters.</CommandEmpty>
             ) : (
               <div data-anim-root className="py-1">

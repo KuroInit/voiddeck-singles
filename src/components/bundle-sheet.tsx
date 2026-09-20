@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Listing } from "@/data/listings";
-import { addToCart, getAllListings } from "@/lib/marketplace";
-import { findCard } from "@/data/cards";
+import { addToCart } from "@/lib/cart";
 import { FoilArt } from "@/components/foil-art";
 import { CardFrame } from "@/components/card-frame";
 import { revealStagger, bump } from "@/lib/motion";
@@ -24,6 +23,8 @@ import { toast } from "sonner";
 type BundleSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Full sale catalogue from the server, for resolving bundle lines. */
+  listings: Listing[];
   prefillGoal?: string;
   prefillBudget?: number;
 };
@@ -41,6 +42,7 @@ const EXAMPLES: { goal: string; budget: number }[] = [
 export function BundleSheet({
   open,
   onOpenChange,
+  listings,
   prefillGoal,
   prefillBudget,
 }: BundleSheetProps) {
@@ -50,7 +52,6 @@ export function BundleSheet({
   const [bundle, setBundle] = useState<BundleOk | null>(null);
   const [noFit, setNoFit] = useState<BundleNoFit | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
   const linesRef = useRef<HTMLDivElement | null>(null);
   const cartBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -63,7 +64,6 @@ export function BundleSheet({
       setNoFit(null);
       setError(null);
       setPending(false);
-      setListings(getAllListings());
     }
   }, [open, prefillGoal, prefillBudget]);
 
@@ -111,7 +111,11 @@ export function BundleSheet({
 
   const addAll = () => {
     if (!bundle) return;
-    for (const line of bundle.lines) addToCart(line.id, line.qty);
+    for (const line of bundle.lines) {
+      const listing = listingById.get(line.id);
+      if (!listing) continue;
+      addToCart(line.id, line.qty, { maxQty: listing.qty });
+    }
     if (cartBtnRef.current) bump(cartBtnRef.current);
     toast.success("Bundle added to cart — demo only, stored in your browser");
   };
@@ -200,22 +204,21 @@ export function BundleSheet({
               <div data-anim="item" className="space-y-2">
                 {bundle.lines.map((line) => {
                   const listing = listingById.get(line.id) ?? null;
-                  const card = listing ? findCard(listing.cardCode) : null;
                   return (
                     <div
                       key={line.id}
                       className="flex items-center gap-3 rounded-lg border border-border px-3 py-2"
                     >
-                      <FoilArt cardCode={card?.cardCode ?? listing?.cardCode ?? null} className="h-12 w-9 shrink-0 rounded ring-1 ring-foreground/10">
-                        {card?.imageUrl ? (
+                      <FoilArt cardCode={listing?.cardCode ?? null} className="h-12 w-9 shrink-0 rounded ring-1 ring-foreground/10">
+                        {listing?.imageUrl ? (
                           <img
-                            src={card.imageUrl}
-                            alt={card.fullName}
+                            src={listing.imageUrl}
+                            alt={listing.cardName}
                             className="h-full w-full object-cover"
                           />
                         ) : (
                           <CardFrame
-                            name={card?.fullName ?? listing?.cardName ?? line.id}
+                            name={listing?.cardName ?? line.id}
                             rarity={listing?.rarity}
                             className="h-full w-full"
                           />
