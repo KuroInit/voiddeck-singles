@@ -114,13 +114,13 @@ export default async function NotesPage() {
             <strong>Reference prices are a dated snapshot</strong>, not live data:{" "}
             {sourceLabel}
             {meta.asOf ? `, ${meta.asOf}` : ""} — {stats.variationCount.toLocaleString()}{" "}
-            per-variation rows ({stats.foilCount.toLocaleString()} foil). Bilgewater
-            Market&apos;s API is bot-walled (Firebase App Check + reCAPTCHA), so the
-            snapshot is produced offline by a local Playwright script and committed
-            with its <code>asOf</code> date; the app never scrapes at runtime. Because
-            there is a single dated point rather than a price history, listing pages
-            show <strong>Market Cost</strong> as of the snapshot instead of a chart.
-            USD → SGD uses a fixed demo rate of {USD_SGD}, displayed with &ldquo;≈&rdquo;.
+            per-variation rows ({stats.foilCount.toLocaleString()} foil). The source
+            does not offer public programmatic access, so the snapshot is produced
+            offline and committed with its <code>asOf</code> date; the app never
+            fetches prices at runtime. Because there is a single dated point rather
+            than a price history, listing pages show <strong>Market Cost</strong> as of
+            the snapshot instead of a chart. USD → SGD uses a fixed demo rate of{" "}
+            {USD_SGD}, displayed with &ldquo;≈&rdquo;.
           </li>
           <li>
             Card data comes from the <code>riftbound-cards</code> fan dataset (code
@@ -183,9 +183,9 @@ export default async function NotesPage() {
             without any access control.
           </li>
           <li>
-            <strong>Live price refresh</strong> — the only public price source is
-            bot-walled; shipping a dated, labelled snapshot is honest, a scraper is
-            not.
+            <strong>Live price refresh</strong> — the only public price source does not
+            offer programmatic access; shipping a dated, labelled snapshot is honest,
+            a scraper is not.
           </li>
           <li>
             <strong>Embeddings</strong> — model intent-parsing plus deterministic
