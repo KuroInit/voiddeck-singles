@@ -32,13 +32,14 @@ export default async function Home() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
       <header className="mb-5 sm:mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Riftbound singles, <span className="text-primary">Singapore</span>
+        <h1 className="text-2xl font-semibold tracking-[0.04em] text-gold-bright uppercase sm:text-3xl">
+          Riftbound singles, <span className="text-gold">Singapore</span>
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
-          Buy, sell, and look for Riftbound cards. Plain search, facet filters, and a
-          grounded shop assistant included.
+          Buy, sell, and look for Riftbound cards under one HDB block. Natural-language
+          search, facet filters, and a grounded shop assistant included.
         </p>
+        <div className="rune-divider mt-4 max-w-xs" />
       </header>
 
       <HomeTabs sale={sale} wants={posts} user={user} catalog={catalog} />

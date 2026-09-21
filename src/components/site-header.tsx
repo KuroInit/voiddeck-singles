@@ -97,17 +97,21 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-gold/25 bg-hex-deep/90 shadow-[0_1px_0_0_rgba(200,170,110,0.12),0_10px_30px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md">
+      <div
+        aria-hidden
+        className="h-px w-full bg-gradient-to-r from-transparent via-gold/60 to-transparent"
+      />
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 text-base font-black text-zinc-950 shadow-sm shadow-amber-900/40">
+          <span className="chamfer flex size-9 shrink-0 items-center justify-center bg-[linear-gradient(160deg,#c8aa6e,#785a28)] text-base font-black text-[#081018] shadow-[0_0_14px_-4px_rgba(200,170,110,0.7)]">
             V
           </span>
           <span className="flex min-w-0 flex-col">
-            <span className="text-[15px] leading-tight font-semibold tracking-tight text-zinc-100 sm:text-base">
-              Voiddeck <span className="text-amber-400">Singles</span>
+            <span className="font-heading text-[15px] leading-tight font-semibold tracking-[0.06em] text-gold-bright uppercase sm:text-base">
+              Voiddeck <span className="text-gold">Singles</span>
             </span>
-            <span className="hidden text-xs text-zinc-500 sm:block">
+            <span className="hidden text-xs text-muted-foreground sm:block">
               the void-deck card market for Riftbound
             </span>
           </span>
@@ -115,7 +119,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/notes"
-            className="text-[13px] text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline sm:text-sm"
+            className="text-[13px] text-muted-foreground underline-offset-2 transition-colors hover:text-gold-bright hover:underline sm:text-sm"
           >
             Notes
           </Link>
@@ -130,7 +134,7 @@ export function SiteHeader() {
               type="button"
               onClick={() => setUserOpen(true)}
               title="Local demo account — click to switch"
-              className="rounded-full border border-amber-700/60 px-3 py-1.5 text-[13px] font-medium text-amber-400 transition-colors hover:border-amber-500 hover:text-amber-300 sm:text-sm"
+              className="rounded-full border border-gold/50 px-3 py-1.5 text-[13px] font-medium text-gold transition-colors hover:border-gold hover:text-gold-bright sm:text-sm"
             >
               @{user.handle}
             </button>
@@ -138,7 +142,7 @@ export function SiteHeader() {
             <Button
               variant="outline"
               size="sm"
-              className="h-9 border-zinc-700 px-3.5 text-[13px] sm:text-sm"
+              className="h-9 border-gold/40 px-3.5 text-[13px] hover:border-gold hover:text-gold-bright sm:text-sm"
               onClick={() => setUserOpen(true)}
             >
               Sign in
@@ -147,14 +151,14 @@ export function SiteHeader() {
           <Button
             variant="outline"
             size="sm"
-            className="relative h-10 gap-2 border-zinc-700 px-3.5 text-[13px] sm:text-sm"
+            className="relative h-10 gap-2 border-gold/40 px-3.5 text-[13px] hover:border-gold hover:text-gold-bright sm:text-sm"
             onClick={() => setCartOpen(true)}
           >
             Cart
             {mounted && count > 0 ? (
               <span
                 ref={badgeRef}
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 text-[11px] font-semibold text-zinc-950"
+                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground"
               >
                 {count}
               </span>

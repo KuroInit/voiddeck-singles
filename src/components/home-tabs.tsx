@@ -55,14 +55,26 @@ export function HomeTabs({
 
   return (
     <Tabs value={tab} onValueChange={handleTabChange} className="gap-3">
-      <TabsList className="h-11 w-full sm:h-12">
-        <TabsTrigger value="buy" className="flex-1 text-sm sm:text-[15px]">
+      <TabsList
+        variant="line"
+        className="h-11 w-full justify-stretch gap-0 rounded-none border-b border-gold/25 bg-hex-deep/60 sm:h-12"
+      >
+        <TabsTrigger
+          value="buy"
+          className="font-heading flex-1 rounded-none text-[13px] tracking-[0.12em] uppercase after:bg-primary data-active:text-gold-bright sm:text-sm"
+        >
           Buy
         </TabsTrigger>
-        <TabsTrigger value="sell" className="flex-1 text-sm sm:text-[15px]">
+        <TabsTrigger
+          value="sell"
+          className="font-heading flex-1 rounded-none text-[13px] tracking-[0.12em] uppercase after:bg-primary data-active:text-gold-bright sm:text-sm"
+        >
           Sell
         </TabsTrigger>
-        <TabsTrigger value="looking" className="flex-1 text-sm sm:text-[15px]">
+        <TabsTrigger
+          value="looking"
+          className="font-heading flex-1 rounded-none text-[13px] tracking-[0.12em] uppercase after:bg-primary data-active:text-gold-bright sm:text-sm"
+        >
           Looking for
         </TabsTrigger>
       </TabsList>

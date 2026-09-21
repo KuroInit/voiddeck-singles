@@ -69,17 +69,17 @@ export function ListingCard({
       ref={ref}
       href={`/listing/${listing.id}`}
       data-anim="item"
-      className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+      className="block outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
     >
       <Card
         className={cn(
-          "gap-0 overflow-hidden p-0 py-0 transition-colors hover:border-zinc-600",
-          listing.printing === "signature" && "bg-gradient-to-r from-amber-500/10"
+          "hextech-frame chamfer gap-0 overflow-hidden rounded-none p-0 py-0",
+          listing.printing === "signature" && "sig"
         )}
       >
         <ListingArt listing={listing} />
         <div className="flex flex-col gap-2 p-3 sm:p-3.5">
-          <p className="line-clamp-2 min-h-10 text-sm leading-snug font-medium text-zinc-100 sm:text-[15px]">
+          <p className="line-clamp-2 min-h-10 text-sm leading-snug font-medium text-gold-bright sm:text-[15px]">
             {listing.cardName}
           </p>
           <div className="flex flex-wrap items-center gap-1">
@@ -89,27 +89,27 @@ export function ListingCard({
             <Badge variant="outline" className={cn("text-[10px] capitalize sm:text-[11px]", rarityClass(listing.rarity))}>
               {listing.rarity}
             </Badge>
-            <Badge variant="outline" className="text-[10px] text-zinc-400 sm:text-[11px]">
+            <Badge variant="outline" className="text-[10px] text-muted-foreground sm:text-[11px]">
               {conditionLabel(listing.condition)}
             </Badge>
             {listing.qty === 4 ? (
-              <Badge variant="outline" className="text-[10px] text-zinc-400 sm:text-[11px]">
+              <Badge variant="outline" className="text-[10px] text-muted-foreground sm:text-[11px]">
                 ×4
               </Badge>
             ) : null}
             {listing.source === "user" ? (
-              <Badge variant="outline" className="border-amber-700 text-[10px] text-amber-400 sm:text-[11px]">
+              <Badge variant="outline" className="border-magic/60 text-[10px] text-magic sm:text-[11px]">
                 your listing
               </Badge>
             ) : null}
           </div>
-          <p className="line-clamp-1 text-xs text-zinc-400 sm:text-[13px]">{listing.note}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground sm:text-[13px]">{listing.note}</p>
           <div className="mt-auto flex items-center justify-between gap-2 pt-1">
             <div className="min-w-0">
-              <span className="text-base font-semibold tracking-tight text-amber-400 tabular-nums sm:text-lg">
+              <span className="text-base font-semibold tracking-tight text-gold tabular-nums sm:text-lg">
                 S${listing.priceSgd.toFixed(2)}
               </span>
-              <span className="block truncate text-[11px] text-zinc-500">@{listing.seller}</span>
+              <span className="block truncate font-mono text-[11px] text-muted-foreground">@{listing.seller}</span>
             </div>
             {onAddToCart ? (
               <Button

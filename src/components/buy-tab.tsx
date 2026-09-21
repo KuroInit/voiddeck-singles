@@ -63,7 +63,7 @@ export function BuyTab({ listings }: { listings: Listing[] }) {
       <FacetBar listings={base ?? catalogue} onChange={onFacets} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-zinc-400 sm:text-[15px]">
+        <p className="text-sm text-muted-foreground sm:text-[15px]">
           {shown.length} {shown.length === 1 ? "listing" : "listings"}
           {base !== null ? ` in ${resultLabel}` : ""}
         </p>
@@ -107,7 +107,7 @@ export function BuyTab({ listings }: { listings: Listing[] }) {
 
       <button
         onClick={() => setAskOpen(true)}
-        className="fixed right-4 bottom-4 z-40 rounded-full bg-amber-400 px-5 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-black/40 transition-colors hover:bg-amber-300 md:text-[15px]"
+        className="btn-hextech chamfer fixed right-4 bottom-4 z-40 px-5 py-3 text-sm font-semibold shadow-lg shadow-black/40 md:text-[15px]"
       >
         Ask the shop
       </button>

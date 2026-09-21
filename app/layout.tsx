@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
@@ -15,6 +15,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const cinzel = Cinzel({
+  variable: "--font-heading",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Voiddeck Singles — Riftbound TCG singles, Singapore",
   description:
@@ -22,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#09090b",
+  themeColor: "#010a13",
   width: "device-width",
   initialScale: 1,
 };
@@ -34,19 +40,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} antialiased min-h-dvh flex flex-col`}
+      >
         <SiteHeader />
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-border/60 bg-zinc-950/60 py-6 text-[13px] text-muted-foreground sm:py-8">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <footer className="mt-6 py-6 text-[13px] text-muted-foreground sm:py-8">
+          <div className="rune-divider mx-auto max-w-6xl" />
+          <div className="mx-auto mt-5 flex max-w-6xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <Link href="/notes" className="hover:text-foreground underline-offset-2 hover:underline">
+              <Link href="/notes" className="text-gold underline-offset-2 hover:underline">
                 Notes
               </Link>
               <span>All listings are fictional demo data</span>
               <span>Unofficial fan demo, not affiliated with Riot Games</span>
             </div>
-            <span>Voiddeck Singles · Singapore</span>
+            <span>
+              Voiddeck Singles · Singapore — <span className="text-gold">confirm can find one</span>
+            </span>
           </div>
         </footer>
         <Toaster />
