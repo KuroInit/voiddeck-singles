@@ -84,7 +84,7 @@ export function fallbackIntent(q: string): SearchIntent {
   const minPrice = minMatch ? Number.parseFloat(minMatch[1]) : undefined;
   const keywords = tokens(q).filter(
     (t) => !PRICE_STOPWORDS[t] && !/^\$?\d+(\.\d+)?$/.test(t)
-  );
+  ).slice(0, 12);
   const intent: SearchIntent = { keywords, sort: "relevance" };
   if (maxPrice !== undefined) intent.maxPrice = maxPrice;
   if (minPrice !== undefined) intent.minPrice = minPrice;

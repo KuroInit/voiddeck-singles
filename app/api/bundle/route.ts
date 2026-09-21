@@ -26,6 +26,9 @@ export async function POST(req: Request) {
   if (!goal || !Number.isFinite(budget) || budget <= 0) {
     return Response.json({ error: "MISSING_INPUT" }, { status: 400 });
   }
+  if (goal.length > 300 || budget > 100_000) {
+    return Response.json({ error: "MISSING_INPUT" }, { status: 400 });
+  }
 
   const allSale = await getListings("sale");
   const candidates = scoreCatalogue(allSale, fallbackIntent(goal)).slice(0, 30);

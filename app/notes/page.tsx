@@ -219,7 +219,12 @@ export default async function NotesPage() {
             figure.
           </li>
           <li>
-            The demo is not deployed yet — it runs locally only (see above).
+            The demo is deployed on Vercel, where the SQLite file lives per-instance in{" "}
+            <code>/tmp</code>: seeded data always appears, but posts and wants you
+            create reset on cold start or redeploy. There is no API rate limiting —
+            an in-memory limiter never fires reliably on serverless, so input lengths
+            are capped at every boundary instead and the AI budget is bounded by the
+            gateway allowance.
           </li>
         </ul>
       </Section>

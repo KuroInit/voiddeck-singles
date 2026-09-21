@@ -124,6 +124,11 @@ only, and every helper no-ops under `prefers-reduced-motion`.
 - No real payments (the checkout modal says so), no access control, no live price
   refresh in the running app, no embeddings, no price history (single dated snapshot
   per variation — the listing page shows Market Cost as of that date).
+- No rate limiting on the API: on serverless an in-memory limiter is per-instance
+  and never fires reliably; a real limiter needs a shared store (e.g. Upstash).
+  Input text is length-capped at every boundary (queries ≤300/500 chars, notes ≤90,
+  prices clamped ≤ S$100k), which bounds per-request AI token cost; the AI budget
+  itself is capped by the gateway allowance.
 - Seeded listings span all five sets (Origins, Proving Grounds, Spiritforged,
   Unleashed, Vendetta); the card database behind the pickers and deck import spans
   the same sets.

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { getDb } from "./db";
@@ -48,7 +49,7 @@ export async function signUpOrSwitch(handle: string): Promise<User> {
   if (existing) {
     user = rowToUser(existing);
   } else {
-    user = { id: `u-${Date.now()}`, handle: clean, kind: "user" };
+    user = { id: `u-${Date.now()}-${randomUUID().slice(0, 8)}`, handle: clean, kind: "user" };
     db.prepare("INSERT INTO users (id, handle, kind, created_at) VALUES (?, ?, 'user', ?)").run(
       user.id,
       user.handle,
@@ -59,6 +60,7 @@ export async function signUpOrSwitch(handle: string): Promise<User> {
   store.set(USER_COOKIE, user.id, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });

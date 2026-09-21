@@ -119,38 +119,103 @@ function deckName(html: string, url: string): string {
   const t = html.match(/<title>([^<]*)<\/title>/);
   if (t) {
     const name = decodeEntities(t[1]).replace(/\s*\|\s*riftdecks\.com\s*/i, "").trim();
-    if (name) return name;
+    if (name) return name.slice(0, 80);
   }
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
-  if (h1 && stripTags(h1[1])) return stripTags(h1[1]);
+  if (h1 && stripTags(h1[1])) return stripTags(h1[1]).slice(0, 80);
   const slug = url.split("/").pop()?.replace(/^deck-/, "") ?? "deck";
-  return slug.replace(/-/g, " ").replace(/\s+\d+$/, "");
+  return slug.replace(/-/g, " ").replace(/\s+\d+$/, "").slice(0, 80);
 }
 
 /**
  * riftdecks.com sits behind a Cloudflare managed challenge that blocks Node's
  * TLS/HTTP fingerprint (plain fetch → 403 "Just a moment...") while allowing
- * curl. Try native fetch first, then fall back to spawning curl with the same
- * headers. Either path returns the raw HTML or throws.
+ * curl. Try native fetch first (redirects validated hop-by-hop), then fall
+ * back to curl — also hop-by-hop, execFile argv (no shell), 16 MB maxBuffer.
+ * Either path returns the raw HTML or throws.
  */
-async function fetchPageHtml(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, accept: "text/html" },
-      redirect: "follow",
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (res.ok) return await res.text();
-  } catch {
-    // fall through to curl
-  }
+async function curlFetch(url: string): Promise<string> {
   const run = promisify(execFile);
-  const { stdout } = await run(
-    "curl",
-    ["-sS", "-L", "--max-time", "20", "-A", UA, "-H", "accept: text/html", url],
-    { maxBuffer: 16 * 1024 * 1024, timeout: 25_000 }
-  );
-  return stdout;
+  let current = url;
+  for (let hop = 0; hop < 3; hop++) {
+    const { stdout } = await run(
+      "curl",
+      [
+        "-sS", "--max-redirs", "0", "--max-time", "20",
+        "-A", UA, "-H", "accept: text/html",
+        "-w", "\n%{http_code}\t%{redirect_url}",
+        current,
+      ],
+      { maxBuffer: 16 * 1024 * 1024, timeout: 25_000 }
+    );
+    const nl = stdout.lastIndexOf("\n");
+    const body = nl === -1 ? stdout : stdout.slice(0, nl);
+    const [code, redirectUrl] = (nl === -1 ? "" : stdout.slice(nl + 1)).split("\t");
+    if (code >= "300" && code < "400") {
+      if (!redirectUrl) throw new Error("redirect without location");
+      current = new URL(redirectUrl.trim(), current).toString();
+      if (!DECK_URL_RE.test(current)) {
+        throw new Error(`redirect left the pinned host: ${current}`);
+      }
+      continue;
+    }
+    if (code.startsWith("2")) return body;
+    throw new Error(`curl failed: ${code}`);
+  }
+  throw new Error("too many redirects");
+}
+/** Read at most `max` bytes of the body; oversized responses are rejected
+ *  instead of ballooning memory before the 15s timeout. */
+async function boundedText(res: Response, max = 5 * 1024 * 1024): Promise<string> {
+  const declared = Number(res.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > max) {
+    throw new Error(`response too large: ${declared}`);
+  }
+  if (!res.body) return res.text();
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      void reader.cancel();
+      throw new Error(`response too large: >${max}`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function fetchPageHtml(url: string): Promise<string> {
+  // redirect:"manual" + per-hop DECK_URL_RE re-validation: the pinned host must
+  // hold across the whole redirect chain, not just hop 1.
+  let current = url;
+  try {
+    for (let hop = 0; hop < 3; hop++) {
+      const res = await fetch(current, {
+        headers: { "User-Agent": UA, accept: "text/html" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) throw new Error("redirect without location");
+        current = new URL(location, current).toString();
+        if (!DECK_URL_RE.test(current)) {
+          throw new Error(`redirect left the pinned host: ${current}`);
+        }
+        continue;
+      }
+      if (res.ok) return await boundedText(res);
+      throw new Error(`fetch failed: ${res.status}`);
+    }
+    throw new Error("too many redirects");
+  } catch {
+    // fall through to curl (Cloudflare-managed challenge blocks Node fetch)
+  }
+  return curlFetch(url);
 }
 
 export async function fetchDeck(url: string): Promise<ImportedDeck> {

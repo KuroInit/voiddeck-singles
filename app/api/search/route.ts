@@ -29,6 +29,9 @@ export async function POST(req: Request) {
   if (!q) {
     return Response.json({ error: "MISSING_Q" }, { status: 400 });
   }
+  if (q.length > 300) {
+    return Response.json({ error: "QUERY_TOO_LONG" }, { status: 400 });
+  }
 
   // Unconfigured gateway, timeouts, bad JSON, malformed shapes — every failure
   // degrades to the deterministic parse, so search never hard-fails on the AI.

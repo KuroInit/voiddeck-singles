@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { getDb, readVariationsFile } from "./db";
 import { getCurrentUser } from "./users";
 import { USD_SGD } from "./prices";
@@ -156,7 +158,9 @@ export type WantPostInput = {
 };
 
 function newPostId(): string {
-  return `U-${Date.now()}`;
+  // Two posts in the same millisecond collide on the PRIMARY KEY — suffix a
+  // random component so a double-submit burst 500s are impossible.
+  return `U-${Date.now()}-${randomUUID().slice(0, 8)}`;
 }
 
 // The current user is resolved from the vds_user cookie (async in Next 15);

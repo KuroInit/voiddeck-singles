@@ -101,6 +101,10 @@ export async function POST(req: Request) {
   const url = typeof body.url === "string" ? body.url.trim() : "";
 
   if (text) {
+    // Bound the paste: parseDeckText runs per-line catalogue lookups.
+    if (text.length > 50_000) {
+      return Response.json({ error: "DECK_TOO_LARGE" }, { status: 413 });
+    }
     try {
       return respond(await parseDeckText(text));
     } catch {

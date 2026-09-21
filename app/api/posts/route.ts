@@ -36,19 +36,25 @@ export async function POST(request: Request) {
   if (typeof body.cardName !== "string" || body.cardName.trim().length === 0) return bad("INVALID_CARD_NAME");
   if (body.note !== undefined && typeof body.note !== "string") return bad("INVALID_NOTE");
 
+  // Length/numeric caps: bound storage per row and keep user text out of the
+  // oversized-prompt cost amplification on the AI routes (see ask/bundle).
+  const clampStr = (v: string, max: number) => v.slice(0, max);
+  const cardName = clampStr(body.cardName.trim(), 80);
+  const note = typeof body.note === "string" ? clampStr(body.note.trim(), 90) : "";
+  const grade = typeof body.grade === "string" && body.grade.length > 0 ? clampStr(body.grade, 24) : null;
+  const cardCode =
+    body.cardCode === null || body.cardCode === undefined ? null : clampStr(String(body.cardCode), 40);
+
   const qty = body.qty === undefined ? 1 : asNumber(body.qty);
   if (qty === null || qty < 1 || !Number.isInteger(qty)) return bad("INVALID_QTY");
+  const qtyCapped = Math.min(qty, 999);
 
-  const cardCode = body.cardCode === null || body.cardCode === undefined ? null : String(body.cardCode);
-  const cardName = body.cardName;
-  const note = typeof body.note === "string" ? body.note : "";
-  const grade = typeof body.grade === "string" && body.grade.length > 0 ? body.grade : null;
   const source = body.source === "ai_proposed" ? "ai_proposed" : "user";
 
   const shared = {
     cardCode,
     cardName,
-    qty,
+    qty: qtyCapped,
     note,
     grade,
     source,
@@ -67,12 +73,12 @@ export async function POST(request: Request) {
     if (kind === "sell") {
       const priceSgd = asNumber(body.priceSgd);
       if (priceSgd === null || priceSgd < 0) return bad("INVALID_PRICE");
-      const listing = await addSellListing({ ...shared, priceSgd });
+      const listing = await addSellListing({ ...shared, priceSgd: Math.min(priceSgd, 100_000) });
       return Response.json({ listing });
     }
     const budgetSgd = asNumber(body.budgetSgd);
     if (budgetSgd === null || budgetSgd < 0) return bad("INVALID_BUDGET");
-    const listing = await addWtbPost({ ...shared, budgetSgd });
+    const listing = await addWtbPost({ ...shared, budgetSgd: Math.min(budgetSgd, 100_000) });
     return Response.json({ listing });
   } catch (err) {
     if (err instanceof NoUserError) return Response.json({ error: "NO_USER" }, { status: 401 });
