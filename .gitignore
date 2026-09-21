@@ -43,3 +43,10 @@ next-env.d.ts
 
 # local database
 data/
+
+# graphify knowledge graph output
+graphify-out/
+
+# headroom compression cache
+.headroom/
+*.headroom*
