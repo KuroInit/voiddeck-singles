@@ -15,7 +15,11 @@ type FoilFile = { codes?: string[] };
 const PRICES_FILE = pricesJson as PricesFile;
 const FOIL_FILE = foilJson as FoilFile;
 
-export const DATA_DIR = path.join(process.cwd(), "data");
+/** Serverless hosts (Vercel) mount the project dir read-only but give a writable
+ *  /tmp — the DB remaps there and re-seeds lazily per cold start (ensureSeeded).
+ *  Local dev keeps data/ so the db persists across restarts. */
+export const DATA_DIR =
+  process.env.VERCEL === "1" ? "/tmp/vds-data" : path.join(process.cwd(), "data");
 export const DB_PATH = path.join(DATA_DIR, "vds.db");
 
 const SEED_HANDLES = [
