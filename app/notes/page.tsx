@@ -9,7 +9,7 @@ import { priceMeta, USD_SGD } from "@/lib/prices";
 export const metadata: Metadata = {
   title: "Notes — Voiddeck Singles",
   description:
-    "What this demo is, what is simulated, where the data comes from, and what was deliberately left out.",
+    "What this demo is, what is simulated, which AI tools and models it uses, what was deliberately left out, and known issues.",
 };
 
 function Section({
@@ -44,189 +44,182 @@ export default async function NotesPage() {
     <div className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6">
       <h1 className="text-2xl font-semibold tracking-tight">Notes</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Voiddeck Singles — an AI-enabled second-hand marketplace for Riftbound TCG singles,
-        built for Singapore buyers and sellers as a demo. Name explained in one line: a
-        &ldquo;void deck&rdquo; is the sheltered ground floor common to HDB blocks, and a
-        &ldquo;single&rdquo; is one card — so: the void-deck card market. The look is
-        &ldquo;Hextech heartland&rdquo;: League of Legends gold-and-navy panels over a
-        faint HDB void-deck tile wall, with a Singlish sign-off in the footer. Search is
-        model-parsed with a deterministic local fallback; the AI also powers the
-        shop Q&A and the deck-core builder.
+        Voiddeck Singles — an AI-enabled second-hand marketplace for Riftbound TCG
+        singles, built as a demo. A &ldquo;void deck&rdquo; is the sheltered ground
+        floor common to HDB blocks, and a &ldquo;single&rdquo; is one card — so: the
+        void-deck card market.
       </p>
 
-      <Section title="What this is, and who it is for">
+      <Section title="What you built, and who it is for">
         <p>
-          Local Singapore Riftbound players and collectors: people chasing rare Showcase
-          and Signature printings, and players buying several singles at once to finish a
-          deck. Three flows cover that — <strong>Buy</strong>, <strong>Sell</strong>, and{" "}
-          <strong>Looking for</strong> (a want-to-buy board that auto-matches active
-          listings).
+          A mobile-first marketplace demo for <strong>local Singapore Riftbound
+          players and collectors</strong>: people chasing rare Showcase / Signature
+          printings, and players buying several singles at once to finish a deck.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>Buy</strong> — a grid of listings with facet filters and price
+            sort; each listing opens a detail page with the card art, a
+            &ldquo;Market Cost&rdquo; reference panel, and a simulated cart and
+            checkout.
+          </li>
+          <li>
+            <strong>Sell</strong> — pick a card from the full Riftbound card database
+            so every listing maps to a valid card, then set condition, qty, pickup and
+            asking price.
+          </li>
+          <li>
+            <strong>Looking for</strong> — a want-to-buy board that auto-matches each
+            want against active sale listings, or honestly reports &ldquo;No matches
+            yet&rdquo;. Both the market and the board have{" "}
+            <strong>natural-language search</strong>.
+          </li>
+          <li>
+            <strong>AI surfaces</strong> — a catalogue-grounded shop Q&A that cites
+            listing ids and says what the listings do <em>not</em> establish, a
+            deck-core builder that composes a cart under a budget, and deck import
+            from a riftdecks.com link.
+          </li>
+        </ul>
+        <p>
+          The look is &ldquo;Hextech heartland&rdquo;: League-of-Legends gold and navy
+          panels over a faint HDB void-deck tile wall.
         </p>
       </Section>
 
-      <Section title="What is seeded and what is simulated">
+      <Section title="What is seeded, simulated or otherwise limited">
         <ul className="list-disc space-y-1 pl-5">
           <li>
             All sellers, handles, stock counts, pickup notes and asking prices are{" "}
-            <strong>fictional demo data</strong>. {stats.saleCount} sale listings and{" "}
-            {stats.wantCount} want-to-buy posts (seeded, plus anything you post) live
-            in the local database.
+            <strong>fictional demo data</strong> — {stats.saleCount} sale listings and{" "}
+            {stats.wantCount} want-to-buy posts are seeded, spanning{" "}
+            <strong>all five sets</strong> ({sets.join(", ")}). Card{" "}
+            <em>names and set facts are real</em>, verified against public Riftbound
+            set lists.
           </li>
           <li>
             <strong>Checkout is simulated</strong> and labelled as such — no payment is
             processed, no order leaves your browser.
           </li>
           <li>
-            Listings, wants and posts you create are stored in the{" "}
+            Listings, wants and posts you create go into the{" "}
             <strong>local database file</strong> (<code>data/vds.db</code>, embedded
             SQLite via Node&apos;s built-in <code>node:sqlite</code>) alongside the
-            seeded marketplace, and are labelled &ldquo;demo — stored in your local
-            database&rdquo;. The cart alone stays in your browser (<code>localStorage</code>
-            : <code>vds_cart</code>). Signing in creates a handle-only local demo
-            account — {stats.userCount} demo account{stats.userCount === 1 ? "" : "s"} so
-            far, no passwords.
+            seeded marketplace; the cart stays in your browser (
+            <code>localStorage: vds_cart</code>). Signing in creates a handle-only
+            local demo account — no passwords, {stats.userCount} demo account
+            {stats.userCount === 1 ? "" : "s"} so far.
           </li>
           <li>
-            Seeded listings span <strong>all five sets</strong> (Origins, Proving
-            Grounds, Spiritforged, Unleashed, Vendetta) — all six runes in multiple
-            printings, chase epics, playsets and commons. Card{" "}
-            <em>names and set facts are real</em> — verified against public Riftbound set
-            lists.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title="Data sources and licences">
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            <strong>Card database</strong> — {stats.cardCount.toLocaleString()} printings
-            from the <code>riftbound-cards</code> fan dataset (code MIT; card data © Riot
-            Games), covering {sets.join(", ")}. It powers the Sell / Looking-for pickers
-            and deck import, so every listing maps to a valid card.
-          </li>
-          <li>
-            <strong>Card art</strong> is hot-linked from Riot&apos;s CDN, never committed
-            to the project, and shown under Riot&apos;s fan-content policy. When art is
-            missing, a locally generated <code>CardFrame</code> SVG placeholder
-            renders instead.
-          </li>
-          <li>
-            <strong>Reference prices</strong> come from a dated snapshot:{" "}
+            <strong>Reference prices are a dated snapshot</strong>, not live data:{" "}
             {sourceLabel}
-            {meta.asOf ? `, ${meta.asOf}` : ""}. The snapshot is stored per printing
-            variation ({stats.variationCount.toLocaleString()} variation rows,{" "}
-            {stats.foilCount.toLocaleString()} of them foil) and rendered{" "}
-            <em>jankrats-style</em> — one outbound link per variation — on listing
-            pages. The app never scrapes prices at runtime — Bilgewater Market&apos;s
-            API sits behind Firebase App Check and reCAPTCHA, so the snapshot is
-            produced offline by a local Playwright script and committed with its{" "}
-            <code>asOf</code> date. USD → SGD uses a fixed demo rate of{" "}
-            {USD_SGD} displayed with &ldquo;≈&rdquo;.
+            {meta.asOf ? `, ${meta.asOf}` : ""} — {stats.variationCount.toLocaleString()}{" "}
+            per-variation rows ({stats.foilCount.toLocaleString()} foil). Bilgewater
+            Market&apos;s API is bot-walled (Firebase App Check + reCAPTCHA), so the
+            snapshot is produced offline by a local Playwright script and committed
+            with its <code>asOf</code> date; the app never scrapes at runtime. Because
+            there is a single dated point rather than a price history, listing pages
+            show <strong>Market Cost</strong> as of the snapshot instead of a chart.
+            USD → SGD uses a fixed demo rate of {USD_SGD}, displayed with &ldquo;≈&rdquo;.
           </li>
           <li>
-            Prices shown on listings are <strong>sellers&apos; asking prices</strong>, not
-            market values — the shop assistant is instructed to say exactly that.
+            Card data comes from the <code>riftbound-cards</code> fan dataset (code
+            MIT; card data © Riot Games); art is hot-linked from Riot&apos;s CDN under
+            Riot&apos;s fan-content policy, with a locally generated SVG placeholder
+            when art is missing.
           </li>
         </ul>
       </Section>
 
-      <Section title="AI: what is real and which model">
+      <Section title="AI coding tools, and which models power search and Q&A">
         <p>
-          <strong>Search is model-parsed.</strong> Both search bars — the market
-          listings and the Looking-for board — send the query to{" "}
-          <code>POST /api/search</code>, where the model turns it into structured
-          intent: keyword phrases, set / printing / rarity / language / condition /
-          type facets, price bounds and sort order. The intent is sanitised against
-          the real catalogue vocabulary (unknown facet values are dropped, never
-          guessed) and scored against the listings by a deterministic scorer.
-          The parsed intent is shown as chips next to the results, so you can see
-          exactly what the model understood.
+          <strong>Build tooling:</strong> the project was implemented with AI coding
+          agents (Claude, driven through an agentic coding harness) under human
+          direction — product and design calls were made by a human, and every
+          submitted change was human-reviewed.
         </p>
         <p>
-          If the gateway is off, times out or returns something unusable, the same
-          query is parsed locally — token scoring plus a little price parsing
-          (&ldquo;removal under $1&rdquo;) — and the chip says{" "}
-          <strong>local parse</strong> instead of <strong>AI-parsed</strong>. Search
-          works either way; the AI just understands messier sentences.
+          <strong>Runtime models:</strong> one chat model serves all AI surfaces —{" "}
+          <code>openai/gpt-4o-mini</code> via the OpenAI-compatible gateway, keyed
+          from server-only environment variables (<code>AI_BASE_URL</code>,{" "}
+          <code>AI_API_KEY</code>, <code>AI_MODEL</code>); nothing is hardcoded and no
+          key ever reaches the browser. The gateway may substitute another model when
+          the weekly allowance runs out — the app only assumes an OpenAI-compatible{" "}
+          <code>/chat/completions</code>, so it keeps working either way.
         </p>
-        <p>
-          The other AI surfaces are the <strong>shop Q&A</strong> and the{" "}
-          <strong>deck-core builder</strong>: both call a real OpenAI-compatible chat
-          endpoint from the server, keyed from server-only environment variables (
-          <code>AI_BASE_URL</code>, <code>AI_API_KEY</code>, <code>AI_MODEL</code>). The
-          model id is whatever <code>AI_MODEL</code> is set to in the local{" "}
-          <code>.env</code> — it is not hardcoded.
-        </p>
-        <p>
-          The Q&A assistant is grounded on retrieved listings only (retrieved by the
-          same deterministic scorer as search) and is told to name what the listings do
-          not establish. Builder numbers are never trusted: every line is
-          repriced and re-clamped server-side against the real listing data.
-        </p>
-        <p>
-          The chat model is <code>openai/gpt-4o-mini</code> served through the
-          CognitioLabs class gateway (OpenRouter route). The gateway may substitute
-          another model when the weekly allowance runs out — the app only assumes an
-          OpenAI-compatible <code>/chat/completions</code>, so it keeps working either
-          way.
-        </p>
-        <p>
-          If the gateway is not configured, the AI surfaces render an honest
-          &ldquo;AI unavailable&rdquo; state instead of a plausible-sounding fake answer —
-          and search keeps working exactly the same, because it never needed the gateway.
-        </p>
-      </Section>
-
-      <Section title="What was deliberately not built">
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong>Real payments</strong> — a demo cannot be trusted with card details,
-            and the brief&apos;s core flow must not require login.
+            <strong>Search</strong> — the query is parsed by the model server-side
+            (<code>POST /api/search</code>) into structured intent (keywords, set /
+            printing / rarity / language / condition / type facets, price bounds, sort
+            order), sanitised against the real catalogue vocabulary, then scored
+            deterministically against the catalogue. The parsed intent is shown as
+            chips. If the gateway is off or unusable, the same query falls back to a
+            local deterministic parser — search always works, and the UI says which
+            parser ran.
           </li>
           <li>
-            <strong>Auth / accounts</strong> — no login wall and no passwords; sign-in is
-            a one-click local demo handle, and posts are attributed to it without any
-            access control.
+            <strong>Shop Q&amp;A</strong> — grounded on retrieved listings only, cites
+            listing ids like [L07], and is instructed to name what the listings do not
+            establish instead of guessing.
+          </li>
+          <li>
+            <strong>Deck-core builder</strong> — proposes a cart from available
+            singles; every line is repriced and re-clamped server-side against the real
+            listing data, so model-authored numbers are never trusted.
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="What we chose not to build, and why">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>Real payments</strong> — a demo cannot be trusted with card
+            details, and the brief&apos;s core flow must not require login.
+          </li>
+          <li>
+            <strong>Auth / accounts</strong> — no login wall and no passwords;
+            sign-in is a one-click local demo handle, and posts are attributed to it
+            without any access control.
           </li>
           <li>
             <strong>Live price refresh</strong> — the only public price source is
-            bot-walled; shipping a dated, labelled snapshot is honest, a scraper is not.
+            bot-walled; shipping a dated, labelled snapshot is honest, a scraper is
+            not.
           </li>
           <li>
-            <strong>Embeddings</strong> — gateway embedding support was unknown at build
-            time; intent-parsing plus deterministic scoring needs no extra dependency.
+            <strong>Embeddings</strong> — model intent-parsing plus deterministic
+            scoring needs no extra dependency and works with the gateway off.
           </li>
           <li>
-            <strong>Hosting / CI</strong> — this build is intentionally local-only.
+            <strong>Hosting / CI</strong> — the build is intentionally local-only for
+            now; public deployment is planned but not done.
           </li>
         </ul>
       </Section>
 
-      <Section title="Known issues">
+      <Section title="Known issues and unfinished parts">
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            Some seeded listings deliberately omit a language or leave other fields unset —
-            that is the honesty demo for the Q&A assistant, not a data bug.
+            Some seeded listings deliberately omit a language or leave other fields
+            unset — that is the honesty demo for the Q&amp;A assistant, not a data bug.
           </li>
           <li>
-            Deck import depends on <code>riftdecks.com</code> page markup staying as it is;
-            a pasted-decklist fallback covers markup drift.
+            Deck import depends on <code>riftdecks.com</code> page markup staying as it
+            is; a pasted-decklist fallback covers markup drift.
           </li>
           <li>
-            Want-to-buy matching is by card and budget only; it does not model condition
-            upgrades or quantity bundling across sellers.
+            Want-to-buy matching is by card and budget only; it does not model
+            condition upgrades or quantity bundling across sellers.
           </li>
           <li>
-            Reference prices are a snapshot: they can lag the market, and they are shown as
-            reference only.
+            Reference prices are a snapshot: they can lag the market, and there is no
+            price history to chart — overnumbered showcase promos with no snapshot
+            entry show &ldquo;no reference price available&rdquo; instead of a guessed
+            figure.
           </li>
           <li>
-            A few showcase-promo printings (the overnumbered &ldquo;star&rdquo; codes) have
-            no reference price in the snapshot; the honest fallback — &ldquo;no reference
-            price available&rdquo; — is shown instead of a guessed figure.{" "}
-            <code>jankrats.com</code> was evaluated as an extra source and skipped: it is a
-            login-walled collection tracker whose prices are just outbound links to
-            Bilgewater Market, i.e. the same data we already snapshot directly.
+            The demo is not deployed yet — it runs locally only (see above).
           </li>
         </ul>
       </Section>

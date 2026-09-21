@@ -14,7 +14,7 @@ multiple singles to build decks.
 
 | Surface | Behaviour |
 | --- | --- |
-| **Buy** | Mobile-first grid of seeded + your own listings, facet filters, price sort, listing detail with a reference price line, simulated cart + demo checkout. |
+| **Buy** | Mobile-first grid of seeded + your own listings, facet filters, price sort, listing detail with a Market Cost reference panel, simulated cart + demo checkout. |
 | **Sell** | Pick a card from the **full Riftbound card database** (1,188 printings across Origins / Proving Grounds / Spiritforged / Unleashed / Vendetta) so every listing maps to a valid card, then set condition, qty, pickup and your asking price (prefilled from the price snapshot). |
 | **Looking for** | WTB board with a budget per want; each want is auto-matched against active sale listings (`cheapest listing ≤ budget`), or honestly reported as "No matches yet". |
 | **Search** | Natural-language search over the listings and the want board ("foil showcase legends under $30", "jinx alt art"). The query is parsed server-side by the model (`POST /api/search`) into structured intent — keywords, set/printing/rarity/language/condition/type facets, price bounds, sort order — then scored against the catalogue by a deterministic scorer. With the gateway off (or on any parse failure) the same query falls back to local token/price parsing, so search always works; the UI shows which parser ran. |
@@ -93,12 +93,17 @@ Playwright never runs as part of the app — prices are a committed build-time s
 
 ## Design system
 
-Dark-first shadcn zinc palette with an amber-400 accent. One rarity colour language
-(`src/lib/rarity.ts`) shared by listing chips, `CardFrame` gradients and import rows:
-common zinc · uncommon sky · rare violet · epic fuchsia · showcase amber; Signature
-listings get an amber tint. Motion helpers live in `src/lib/motion.ts` (`revealStagger`,
-`tabSwap`, `bump`, `pressable`) — durations ≤250 ms, decorative only, and every helper
-no-ops under `prefers-reduced-motion`.
+**"Hextech heartland"** — League-of-Legends gold and navy (`#C8AA6E` / `#F0E6D2` on
+`#010A13`–`#0A1428`, magic-cyan `#0AC8B9` ring) over a faint HDB void-deck tile-wall
+texture. Display type is Cinzel (uppercase, tracked); UI text is Geist. Shared surface
+utilities live in `app/globals.css`: `.hextech-frame` (gold gradient border),
+`.chamfer` (LoL-style cut corners), `.btn-hextech` (gold gradient CTA),
+`.rune-divider` (gold hairline + diamond). One rarity colour language
+(`src/lib/rarity.ts`) is shared by listing chips, `CardFrame` gradients and import
+rows: common zinc · uncommon sky · rare violet · epic fuchsia · showcase amber;
+Signature listings get a warm gold wash. Motion helpers live in `src/lib/motion.ts`
+(`revealStagger`, `tabSwap`, `bump`, `pressable`) — durations ≤250 ms, decorative
+only, and every helper no-ops under `prefers-reduced-motion`.
 
 ## Data sources & licences
 
@@ -117,6 +122,8 @@ no-ops under `prefers-reduced-motion`.
   cart alone stays in `localStorage` (`vds_cart`) and is labelled "stored in your
   browser".
 - No real payments (the checkout modal says so), no access control, no live price
-  refresh in the running app, no embeddings.
-- Seeded listings cover an **Origins (OGN)** subset only; the card database behind the
-  pickers and deck import spans all sets.
+  refresh in the running app, no embeddings, no price history (single dated snapshot
+  per variation — the listing page shows Market Cost as of that date).
+- Seeded listings span all five sets (Origins, Proving Grounds, Spiritforged,
+  Unleashed, Vendetta); the card database behind the pickers and deck import spans
+  the same sets.
