@@ -47,9 +47,11 @@ export default async function NotesPage() {
         Voiddeck Singles — an AI-enabled second-hand marketplace for Riftbound TCG singles,
         built for Singapore buyers and sellers as a demo. Name explained in one line: a
         &ldquo;void deck&rdquo; is the sheltered ground floor common to HDB blocks, and a
-        &ldquo;single&rdquo; is one card — so: the void-deck card market. Search is a
-        plain deterministic filter over the listings; the AI shows up in the shop Q&A
-        and the deck-core builder.
+        &ldquo;single&rdquo; is one card — so: the void-deck card market. The look is
+        &ldquo;Hextech heartland&rdquo;: League of Legends gold-and-navy panels over a
+        faint HDB void-deck tile wall, with a Singlish sign-off in the footer. Search is
+        model-parsed with a deterministic local fallback; the AI also powers the
+        shop Q&A and the deck-core builder.
       </p>
 
       <Section title="What this is, and who it is for">
@@ -130,13 +132,25 @@ export default async function NotesPage() {
 
       <Section title="AI: what is real and which model">
         <p>
-          <strong>Search is not AI-powered.</strong> The search bar is a plain,
-          deterministic search over the listings — token scoring with a little local price
-          parsing (&ldquo;removal under $1&rdquo;) — computed in your browser, with no
-          network call and no model involved.
+          <strong>Search is model-parsed.</strong> Both search bars — the market
+          listings and the Looking-for board — send the query to{" "}
+          <code>POST /api/search</code>, where the model turns it into structured
+          intent: keyword phrases, set / printing / rarity / language / condition /
+          type facets, price bounds and sort order. The intent is sanitised against
+          the real catalogue vocabulary (unknown facet values are dropped, never
+          guessed) and scored against the listings by a deterministic scorer.
+          The parsed intent is shown as chips next to the results, so you can see
+          exactly what the model understood.
         </p>
         <p>
-          The two AI surfaces are the <strong>shop Q&A</strong> and the{" "}
+          If the gateway is off, times out or returns something unusable, the same
+          query is parsed locally — token scoring plus a little price parsing
+          (&ldquo;removal under $1&rdquo;) — and the chip says{" "}
+          <strong>local parse</strong> instead of <strong>AI-parsed</strong>. Search
+          works either way; the AI just understands messier sentences.
+        </p>
+        <p>
+          The other AI surfaces are the <strong>shop Q&A</strong> and the{" "}
           <strong>deck-core builder</strong>: both call a real OpenAI-compatible chat
           endpoint from the server, keyed from server-only environment variables (
           <code>AI_BASE_URL</code>, <code>AI_API_KEY</code>, <code>AI_MODEL</code>). The

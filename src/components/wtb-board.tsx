@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Card } from "@/data/cards";
+import type { Listing } from "@/data/listings";
 import type { CatalogFacets, WantPost } from "@/components/home-tabs";
 import { revealStagger, bump } from "@/lib/motion";
 import { CardPicker } from "@/components/card-picker";
+import { SearchBar } from "@/components/search-bar";
 import { Button } from "@/components/ui/button";
 import { Card as WtbCard, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,13 +39,35 @@ export function WtbBoard({
   } | null>(null);
   const [handle, setHandle] = useState("");
   const [signingIn, setSigningIn] = useState(false);
+  const [searchHits, setSearchHits] = useState<Set<string> | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const badgeEls = useRef<Map<string, HTMLElement>>(new Map());
   const bumped = useRef<Set<string>>(new Set());
 
+  /** Wants scored for search: budget acts as the price (so "under $15"
+   * filters on budget), and facet filters are dropped — want rows only
+   * carry card, budget and note, so a rarity filter would wrongly hide
+   * everything. Keywords + price bounds + sort still apply. */
+  const searchableWants = posts.map((p) => ({
+    ...p,
+    source: "seed" as const,
+    priceSgd: p.budgetSgd ?? 0,
+  }));
+
+  const onWantSearchResults = useCallback(
+    (results: Listing[] | null) => {
+      setSearchHits(results ? new Set(results.map((r) => r.id)) : null);
+    },
+    []
+  );
+
+  const visibleWants = searchHits
+    ? posts.filter((p) => searchHits.has(p.id))
+    : posts;
+
   useEffect(() => {
-    if (posts.length > 0 && boardRef.current) revealStagger(boardRef.current);
-  }, [posts]);
+    if (visibleWants.length > 0 && boardRef.current) revealStagger(boardRef.current);
+  }, [visibleWants]);
 
   // Bump each match badge once, the first time it mounts with a match.
   // The match itself was computed on the server and arrives on the post.
@@ -139,8 +163,18 @@ export function WtbBoard({
         <p className="text-sm text-muted-foreground">
           Looking for something? Post a want and see if it matches live listings.
         </p>
-        <Button onClick={() => setPickerOpen(true)}>Post a want</Button>
+        <Button className="btn-hextech" onClick={() => setPickerOpen(true)}>
+          Post a want
+        </Button>
       </div>
+
+      <SearchBar
+        listings={searchableWants}
+        onResults={onWantSearchResults}
+        placeholder="Search the board — try a card or a budget"
+        ariaLabel="Search want posts"
+        examples={["jinx", "alt art", "teemo under $15", "playset", "sealed"]}
+      />
 
       <CardPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={pickCard} facets={catalog} />
 
@@ -189,7 +223,7 @@ export function WtbBoard({
               onChange={(e) => setNote(e.target.value)}
             />
           </div>
-          <Button type="submit" disabled={!canPost} className="w-full">
+          <Button type="submit" disabled={!canPost} className="btn-hextech w-full">
             Post want
           </Button>
         </form>
@@ -225,12 +259,22 @@ export function WtbBoard({
       </p>
 
       <div ref={boardRef} className="space-y-3">
+        {searchHits ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {visibleWants.length} of {posts.length} want
+            {posts.length === 1 ? "" : "s"} match your search
+          </p>
+        ) : null}
         {posts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No wants posted yet.
           </p>
+        ) : visibleWants.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No wants match that search.
+          </p>
         ) : (
-          posts.map((post) => {
+          visibleWants.map((post) => {
             const match = post.match;
             return (
               <WtbCard key={post.id} data-anim="item" className="py-3">

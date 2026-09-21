@@ -14,10 +14,12 @@ type ChatMessage = {
   content: string;
 };
 
-/** POST /chat/completions and parse choices[0].message.content as JSON. */
+/** POST /chat/completions and parse choices[0].message.content as JSON.
+ * Aborts after timeoutMs (default 12s) — callers fall back to local parsing. */
 export async function chatJSON(
   messages: ChatMessage[],
-  maxTokens = 700
+  maxTokens = 700,
+  timeoutMs = 12_000
 ): Promise<unknown> {
   const base = (process.env.AI_BASE_URL || "").replace(/\/+$/, "");
   const key = process.env.AI_API_KEY || "";
@@ -40,6 +42,7 @@ export async function chatJSON(
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify(makeBody(withFormat)),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
   let res = await call(true);
