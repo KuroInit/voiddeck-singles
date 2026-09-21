@@ -50,7 +50,7 @@ export default async function NotesPage() {
         void-deck card market.
       </p>
 
-      <Section title="What you built, and who it is for">
+      <Section title="What this web app is">
         <p>
           A mobile-first marketplace demo for <strong>local Singapore Riftbound
           players and collectors</strong>: people chasing rare Showcase / Signature
